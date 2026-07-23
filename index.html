@@ -195,22 +195,51 @@ header .marca span{color:var(--menta)}
 /* ---------- resumo (estado da união) ---------- */
 .resumo{
   background:linear-gradient(155deg, var(--azul-forte) 0%, #001033 100%);
-  color:#fff;border-radius:var(--r-g);padding:22px 26px;margin-bottom:30px;
+  color:#fff;border-radius:var(--r-g);padding:26px 30px 28px;margin-bottom:32px;
   box-shadow:var(--sombra-g);animation:entra .32s var(--curva) both;
   position:relative;overflow:hidden;
 }
 .resumo::before{
   content:'';position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(60% 140% at 100% 0%, rgba(24,135,200,.22) 0%, transparent 65%);
+  background:radial-gradient(60% 140% at 100% 0%, rgba(24,135,200,.24) 0%, transparent 65%);
 }
-.resumo .rot-grupo{color:rgba(255,255,255,.5);margin-bottom:10px}
-.resumo-linhas{display:flex;flex-direction:column;gap:9px;position:relative}
-.resumo-linha{display:flex;align-items:baseline;gap:10px;font-size:14.5px;line-height:1.5}
-.resumo-linha b{font-family:var(--mono);font-weight:600;letter-spacing:-.02em}
-.resumo-linha .pt{color:rgba(255,255,255,.42);flex:0 0 auto}
-.resumo-linha.alta b{color:var(--menta)}
-.resumo-linha.baixa b{color:#FF9E93}
-@media(max-width:640px){ .resumo{padding:18px 18px} .resumo-linha{font-size:13.5px} }
+.resumo .rot-grupo{color:rgba(255,255,255,.46);margin-bottom:18px}
+.resumo-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
+.resumo-bloco{padding:0 30px}
+.resumo-bloco:first-child{padding-left:0}
+.resumo-bloco:last-child{padding-right:0}
+.resumo-bloco + .resumo-bloco{border-left:1px solid rgba(255,255,255,.14)}
+.resumo-label{
+  display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:12px;
+}
+.resumo-label i{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+.status-alta .resumo-label i{background:var(--menta)}
+.status-atencao .resumo-label i{background:#FFC16E}
+.status-baixa .resumo-label i{background:#FF9E93}
+.resumo-valor{
+  font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.03em;
+  color:#fff;line-height:1.05;margin-bottom:10px;
+}
+.resumo-valor .resumo-unid{
+  font-family:var(--sans);font-size:13.5px;font-weight:500;
+  color:rgba(255,255,255,.5);letter-spacing:0;margin-left:3px;
+}
+.resumo-contexto{font-size:12.5px;color:rgba(255,255,255,.62);line-height:1.55}
+.resumo-selo{
+  display:inline-block;font-family:var(--mono);font-weight:600;
+  padding:1px 7px;border-radius:100px;font-size:11px;margin-right:6px;white-space:nowrap;
+}
+.status-alta .resumo-selo{background:rgba(149,223,194,.16);color:var(--menta)}
+.status-atencao .resumo-selo{background:rgba(255,193,110,.18);color:#FFC16E}
+.status-baixa .resumo-selo{background:rgba(255,158,147,.18);color:#FF9E93}
+@media(max-width:780px){
+  .resumo-grade{grid-template-columns:1fr;gap:20px}
+  .resumo-bloco{padding:0 0 18px!important;border:none!important}
+  .resumo-bloco:not(:last-child){border-bottom:1px solid rgba(255,255,255,.12)!important}
+  .resumo-bloco:last-child{padding-bottom:0!important}
+}
+@media(max-width:640px){ .resumo{padding:20px 20px 22px} .resumo-valor{font-size:25px} }
 
 /* ---------- ajuda colapsável ---------- */
 .ajuda{
@@ -823,14 +852,27 @@ function kpi(rot, val, pe, delta){
   return k;
 }
 
+function blocoResumo(status, label, valor, unidade, contextoHtml){
+  const b = el('div', 'resumo-bloco status-' + status);
+  const lab = el('div','resumo-label');
+  lab.innerHTML = `<i></i>${label}`;
+  const val = el('div','resumo-valor');
+  val.innerHTML = unidade ? `${valor}<span class="resumo-unid"> ${unidade}</span>` : valor;
+  const ctx = el('div','resumo-contexto');
+  ctx.innerHTML = contextoHtml;
+  b.append(lab, val, ctx);
+  return b;
+}
+
 /* ---------- 6.0 resumo (estado da união) ---------- */
 // Sempre reflete o estado atual de verdade (não usa FILTRO_MES): é o
 // "pulso" do negócio, a leitura de baixo não deveria mudar o resumo
-// de cima.
+// de cima. Cada bloco é rótulo + número grande + contexto, não frase
+// corrida: o número precisa bater o olho antes da explicação.
 function secResumo(B, ano, meta, jan, hoje){
   const div = el('div','resumo');
   div.appendChild(el('span','rot-grupo','Resumo de hoje'));
-  const linhas = el('div','resumo-linhas');
+  const grade = el('div','resumo-grade');
 
   // 1. faturamento acumulado vs meta
   const A = new Array(12).fill(0), P = new Array(12).fill(0);
@@ -844,14 +886,17 @@ function secResumo(B, ano, meta, jan, hoje){
   const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
   const metaAcum = accP*(1+meta);
   const difMeta = metaAcum ? (accA/metaAcum - 1)*100 : 0;
-  const l1 = el('div', 'resumo-linha ' + (difMeta>=0?'alta':'baixa'));
-  l1.innerHTML = `<span class="pt">Faturamento</span> Acumulado de ${ano} em <b>${brl(accA)}</b>, `
-    + `${Math.abs(difMeta).toFixed(1).replace('.',',')}% ${difMeta>=0?'acima':'abaixo'} da meta de ${brl(metaAcum)}.`;
-  linhas.appendChild(l1);
+  grade.appendChild(blocoResumo(
+    difMeta >= 0 ? 'alta' : 'baixa',
+    `Faturamento acumulado ${ano}`,
+    brl(accA), null,
+    `<span class="resumo-selo">${difMeta>=0?'+':'−'}${Math.abs(difMeta).toFixed(1).replace('.',',')}%</span> vs. meta de ${brl(metaAcum)}`
+  ));
 
   // 2. clientes atrasados na cadência (mesmo cálculo de secCadencia,
   // com o corte-padrão de CONFIG.ATRASO_MINIMO, sempre sobre o
-  // histórico inteiro)
+  // histórico inteiro). Âmbar, não vermelho: é lembrete de ligação,
+  // não uma perda, mesma leitura já usada no pill "atraso" da cadência.
   const mCad = {};
   B.forEach(r => {
     if(ehDrop(r.cn)) return;
@@ -868,24 +913,27 @@ function secResumo(B, ano, meta, jan, hoje){
     const semComprar = diasEntre(ds[ds.length-1], hoje);
     if(semComprar - ritmo >= CONFIG.ATRASO_MINIMO){ atrasados++; r12Atrasados += c.r12; }
   });
-  const l2 = el('div', 'resumo-linha ' + (atrasados>0?'baixa':'alta'));
-  l2.innerHTML = atrasados > 0
-    ? `<span class="pt">Cadência</span> <b>${atrasados}</b> cliente${atrasados>1?'s':''} na hora de ligar, somando <b>${brl(r12Atrasados)}</b> em receita de 12 meses.`
-    : `<span class="pt">Cadência</span> Nenhum cliente atrasado na cadência agora.`;
-  linhas.appendChild(l2);
+  grade.appendChild(blocoResumo(
+    atrasados > 0 ? 'atencao' : 'alta',
+    'Cadência · na hora de ligar',
+    String(atrasados), atrasados===1?'cliente':'clientes',
+    atrasados > 0 ? `${brl(r12Atrasados)} em receita de 12 meses` : 'Ninguém atrasado agora'
+  ));
 
-  // 3. clientes que cruzaram a linha de inatividade nos últimos 7 dias
+  // 3. clientes que cruzaram a linha de inatividade nos últimos 7 dias:
+  // esse sim é perda de verdade, por isso é o único vermelho dos três.
   const ultCompra = {};
   B.forEach(r => { if(!ultCompra[r.ck] || r.dt > ultCompra[r.ck]) ultCompra[r.ck] = r.dt; });
   const perdidosSemana = Object.values(ultCompra)
     .filter(d => { const dd = diasEntre(d, hoje); return dd > jan && dd <= jan+7; }).length;
-  const l3 = el('div', 'resumo-linha ' + (perdidosSemana>0?'baixa':'alta'));
-  l3.innerHTML = perdidosSemana > 0
-    ? `<span class="pt">Carteira</span> <b>${perdidosSemana}</b> cliente${perdidosSemana>1?'s':''} ${perdidosSemana>1?'cruzaram':'cruzou'} a linha de ${jan} dias sem comprar nos últimos 7 dias.`
-    : `<span class="pt">Carteira</span> Ninguém cruzou a linha de inatividade nos últimos 7 dias.`;
-  linhas.appendChild(l3);
+  grade.appendChild(blocoResumo(
+    perdidosSemana > 0 ? 'baixa' : 'alta',
+    'Carteira · últimos 7 dias',
+    String(perdidosSemana), perdidosSemana===1?'cliente':'clientes',
+    perdidosSemana > 0 ? `cruzaram a linha de ${jan} dias sem comprar` : 'Ninguém cruzou a linha de inatividade'
+  ));
 
-  div.appendChild(linhas);
+  div.appendChild(grade);
   return div;
 }
 
