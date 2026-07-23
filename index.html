@@ -764,7 +764,21 @@ function ler(file){
   fr.onload = () => {
     try{
       const linhas = parseRFNF613(decodificar(fr.result));
-      if(!linhas.length){ diz('Nenhuma linha de faturamento reconhecida. Confira se o CSV é mesmo o RFNF613.'); return; }
+      if(!linhas.length){
+        diz('Nenhuma linha de faturamento foi reconhecida. Diagnóstico:');
+        diz(`  separador detectado ....... ${DIAG.sep}`);
+        diz(`  decimal detectado ......... ${DIAG.decimal}`);
+        diz(`  linhas no arquivo ......... ${DIAG.totalLinhas}`);
+        diz(`  colunas por linha ......... ${DIAG.colunas}  (o esperado é 18 a 20)`);
+        diz(`  descartadas: coluna 1 não é número de NF ... ${DIAG.rej.naoNumerico}`);
+        diz(`  descartadas: data não reconhecida ......... ${DIAG.rej.semData}`);
+        diz(`  descartadas: valor zerado ................. ${DIAG.rej.semValor}`);
+        if(DIAG.exemplos.semData)  diz(`  exemplo de data recusada: ${DIAG.exemplos.semData}`);
+        if(DIAG.exemplos.semValor) diz(`  exemplo de valor recusado: ${DIAG.exemplos.semValor}`);
+        diz('  primeiras linhas do arquivo:');
+        DIAG.primeiras.forEach((l,i) => diz(`   ${i+1}| ${l}`));
+        return;
+      }
       const datas = linhas.map(l => l.emissao).sort();
       PENDENTE = { nome:file.name, linhas };
       diz(`Arquivo: ${file.name}`);
@@ -780,45 +794,71 @@ function ler(file){
   fr.readAsArrayBuffer(file);
 }
 
+// Guarda o motivo de cada linha descartada, para o diagnóstico.
+let DIAG = null;
+
 function parseRFNF613(txt){
-  const cru = txt.split(/\r?\n/);
-  // delimitador: Excel em pt-BR usa ponto e vírgula
-  const amostra = cru.slice(0,40).join('\n');
-  const sep = (amostra.split(';').length > amostra.split(',').length) ? ';' : ',';
-  const decimalVirgula = sep === ';';
+  const cru = txt.split(/\r?\n/).filter(l => l.trim());
+
+  // Delimitador: conta ocorrências fora de aspas nas primeiras linhas.
+  const amostra = cru.slice(0,60).join('\n');
+  const conta = ch => (amostra.split(ch).length - 1);
+  const cand = [[';',conta(';')], [',',conta(',')], ['\t',conta('\t')], ['|',conta('|')]];
+  cand.sort((a,b) => b[1]-a[1]);
+  const sep = cand[0][1] > 0 ? cand[0][0] : ';';
+
+  // Decimal: se aparecer "1.234,56" ou "12,50" é pt-BR. Se o separador
+  // for vírgula, o decimal obrigatoriamente é ponto.
+  const decimalVirgula = sep !== ',' && /\d,\d{2}\b/.test(amostra);
 
   const num = s => {
     if(s == null) return 0;
-    let v = String(s).trim().replace(/\s/g,'');
+    let v = String(s).trim().replace(/[\s\u00A0R$]/g,'');
     if(!v || v === '-') return 0;
     v = decimalVirgula ? v.replace(/\./g,'').replace(',','.') : v.replace(/,/g,'');
     const n = parseFloat(v);
     return isNaN(n) ? 0 : n;
   };
+
   const data = s => {
-    const v = String(s||'').trim();
-    if(/^\d{1,5}$/.test(v)){                       // serial do Excel
-      const d = new Date(Date.UTC(1899,11,30) + (+v)*86400000);
-      return d.toISOString().slice(0,10);
+    let v = String(s||'').trim();
+    if(!v || v === '-') return null;
+    // serial do Excel, com ou sem separador de milhar: 45672 / 45.672 / 45,672
+    const puro = v.replace(/[.,\s]/g,'');
+    if(/^\d{4,6}$/.test(puro) && !v.includes('/') && !v.includes('-')){
+      const n = +puro;
+      if(n > 20000 && n < 70000)
+        return new Date(Date.UTC(1899,11,30) + n*86400000).toISOString().slice(0,10);
     }
-    let m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/aaaa
-    if(m) return `${m[3]}-${m[2]}-${m[1]}`;
-    m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);        // aaaa-mm-dd
-    if(m) return m[0];
+    v = v.split(/[\sT]/)[0];                        // descarta hora, se houver
+    let m = v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);   // d/m/aa(aa)
+    if(m){
+      let [_,d,mo,y] = m;
+      if(y.length === 2) y = (+y > 50 ? '19' : '20') + y;
+      return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+    m = v.match(/^(\d{4})[\-\/](\d{2})[\-\/](\d{2})$/);               // aaaa-mm-dd
+    if(m) return `${m[1]}-${m[2]}-${m[3]}`;
     return null;
   };
 
-  const out = []; let rep = null, cidade = null, uf = null;
-  for(const linha of cru){
-    if(!linha.trim()) continue;
-    const c = dividir(linha, sep);
-    const a = (c[0]||'').trim();
+  const out = [];
+  const rej = { naoNumerico:0, semData:0, semValor:0 };
+  const exemplos = { semData:null, semValor:null };
+  let rep = null, cidade = null, uf = null;
 
-    if(a === 'Representante:'){ rep = (c[3]||'').trim() || null; continue; }
-    if(a === 'Cidade:'){ cidade = (c[1]||'').trim() || null; uf = (c[5]||'').trim() || null; continue; }
-    if(!/^\d+$/.test(a)) continue;                 // cabeçalho de página, rodapé, etc.
-    const dt = data(c[1]); if(!dt) continue;
-    const valor = num(c[14]); if(!valor) continue;
+  for(const linha of cru){
+    const c = dividir(linha, sep).map(x => x.replace(/^["\s]+|["\s]+$/g,''));
+    const a = c[0] || '';
+
+    if(/^Representante/i.test(a)){ rep = (c[3]||'').trim() || null; continue; }
+    if(/^Cidade/i.test(a)){ cidade = (c[1]||'').trim() || null; uf = (c[5]||'').trim() || null; continue; }
+    if(!/^\d+$/.test(a)){ rej.naoNumerico++; continue; }
+
+    const dt = data(c[1]);
+    if(!dt){ rej.semData++; if(!exemplos.semData) exemplos.semData = c.slice(0,4).join(' | '); continue; }
+    const valor = num(c[14]);
+    if(!valor){ rej.semValor++; if(!exemplos.semValor) exemplos.semValor = c.slice(12,16).join(' | '); continue; }
 
     out.push({
       nf: a, emissao: dt,
@@ -836,6 +876,15 @@ function parseRFNF613(txt){
       representante: rep, cidade, uf
     });
   }
+
+  DIAG = {
+    sep: sep === '\t' ? 'TAB' : sep,
+    decimal: decimalVirgula ? 'vírgula (pt-BR)' : 'ponto',
+    totalLinhas: cru.length,
+    colunas: dividir(cru[6] || cru[0] || '', sep).length,
+    rej, exemplos,
+    primeiras: cru.slice(0,8).map(l => l.slice(0,150))
+  };
   return out;
 }
 
