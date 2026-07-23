@@ -37,7 +37,6 @@
   --azul-claro:#EAF2FA;
   --alta:#12735A;
   --alta-fundo:#E7F6F0;
-  --agua:#28AC8B;
   --menta:#95DFC2;
   --baixa:#B4322A;
   --baixa-fundo:#FBEDEB;
@@ -260,7 +259,7 @@ tbody tr:hover{background:var(--véu)}
 .pill{font-size:10.5px;font-family:var(--mono);padding:2px 8px;border-radius:100px}
 .pill.ok{background:var(--alta-fundo);color:var(--alta)}
 .pill.no{background:var(--baixa-fundo);color:var(--baixa)}
-.pill.at{background:var(--baixa-fundo);color:var(--baixa)}
+.pill.at{background:var(--azul-claro);color:var(--azul)}
 .abas{display:flex;gap:7px;margin-bottom:14px}
 .abcGrid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;align-items:start}
 @media(max-width:860px){ .abcGrid{grid-template-columns:1fr} }
@@ -354,7 +353,7 @@ tbody tr:hover{background:var(--véu)}
 <div id="app">
   <header>
     <span class="marca">CAL<span>MART</span></span>
-    <span style="font-size:12px;color:#9AA6B4;letter-spacing:.1em">BI COMERCIAL</span>
+    <span style="font-size:12px;color:rgba(255,255,255,.58);letter-spacing:.1em">BI COMERCIAL</span>
     <div class="dir">
       <span class="quem" id="quem"></span>
       <button class="btn-h" id="btnImportar">Importar CSV</button>
@@ -377,7 +376,7 @@ tbody tr:hover{background:var(--véu)}
     </div>
     <div class="ctrl">
       <label>Cliente PETMED</label>
-      <button class="btn-h on" id="btnPetmed" style="border-color:var(--linha);color:var(--tinta)">Incluída</button>
+      <button class="btn-h" id="btnPetmed" style="background:var(--azul);border-color:var(--azul);color:#fff">Incluída</button>
     </div>
     <div class="ctrl" id="filtroCtrl" style="display:none">
       <label>Mês em foco</label>
@@ -434,8 +433,9 @@ const CONFIG = {
     { nome:'DOGNIFICO + COMP. BR + SJR', contem:['DOGNIFICO','COMPONENTES BR','SJR'] }
   ],
 
-  DIAS_INATIVO      : 120,  // sem compra além disso = perdido
-  META_CRESCIMENTO  : 10,   // % sobre o ano anterior
+  // DIAS_INATIVO e META_CRESCIMENTO não moram aqui: o usuário controla
+  // os dois em tempo real pelos campos #dias e #meta na barra superior
+  // (valores iniciais definidos direto no HTML, 120 e 10).
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
   ATRASO_MINIMO     : 21    // dias de atraso para entrar na worklist
 };
@@ -493,14 +493,20 @@ $('#lembrar').checked = window.localStorage.getItem(CHAVE_LEMBRAR) === '1';
 
 async function entrar(){
   const b = $('#btnEntrar'); b.disabled = true; $('#erroLogin').textContent = '';
-  // Grava a preferência ANTES de logar: é ela que diz ao storageSessao
-  // onde colocar o token que o signInWithPassword está prestes a emitir.
-  window.localStorage.setItem(CHAVE_LEMBRAR, $('#lembrar').checked ? '1' : '0');
-  const { error } = await sb.auth.signInWithPassword({
-    email: $('#email').value.trim(), password: $('#senha').value
-  });
-  b.disabled = false;
-  if(error){ $('#erroLogin').textContent = 'E-mail ou senha não conferem.'; return; }
+  try{
+    // Grava a preferência ANTES de logar: é ela que diz ao storageSessao
+    // onde colocar o token que o signInWithPassword está prestes a emitir.
+    window.localStorage.setItem(CHAVE_LEMBRAR, $('#lembrar').checked ? '1' : '0');
+    const { error } = await sb.auth.signInWithPassword({
+      email: $('#email').value.trim(), password: $('#senha').value
+    });
+    if(error){ $('#erroLogin').textContent = 'E-mail ou senha não conferem.'; return; }
+  }catch(err){
+    $('#erroLogin').textContent = 'Não deu para conectar. Confira sua internet e tente de novo.';
+    return;
+  }finally{
+    b.disabled = false;
+  }
   abrir();
 }
 
@@ -518,14 +524,18 @@ async function abrir(){
   $('#login').style.display = 'none';
   $('#app').style.display   = 'block';
 
-  // Só quem tem pode_importar vê o botão de importação. A trava real
-  // está na RLS do banco; esconder o botão é só para não confundir.
-  const { data:perfil } = await sb.from('perfis')
-    .select('pode_importar').eq('usuario_id', user.id).maybeSingle();
-  PODE_IMPORTAR = perfil?.pode_importar === true;
-  $('#btnImportar').style.display = PODE_IMPORTAR ? '' : 'none';
-
-  await carregar();
+  try{
+    // Só quem tem pode_importar vê o botão de importação. A trava real
+    // está na RLS do banco; esconder o botão é só para não confundir.
+    const { data:perfil } = await sb.from('perfis')
+      .select('pode_importar').eq('usuario_id', user.id).maybeSingle();
+    PODE_IMPORTAR = perfil?.pode_importar === true;
+    $('#btnImportar').style.display = PODE_IMPORTAR ? '' : 'none';
+    await carregar();
+  }catch(err){
+    $('#main').innerHTML = `<div class="vazio"><h3>Não deu para carregar</h3>
+      <p>Falha de conexão ao verificar sua permissão ou buscar os dados. Recarregue a página.</p></div>`;
+  }
 }
 
 /* ==========================================================
@@ -535,19 +545,23 @@ async function abrir(){
    ========================================================== */
 async function carregar(){
   $('#main').innerHTML = '<div class="vazio"><h3>Carregando</h3><p>Buscando o faturamento no banco.</p></div>';
-  const linhas = []; const passo = 1000;
-  for(let de = 0; ; de += passo){
-    const { data, error } = await sb.from('nf_itens')
-      .select('nf,emissao,cliente_cod,cliente_nome,produto_cod,produto_desc,qtd,valor,cidade,uf,representante')
-      .order('emissao', { ascending:true })
-      .range(de, de + passo - 1);
-    if(error){ $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${error.message}</p></div>`; return; }
-    linhas.push(...data);
-    if(data.length < passo) break;
+  try{
+    const linhas = []; const passo = 1000;
+    for(let de = 0; ; de += passo){
+      const { data, error } = await sb.from('nf_itens')
+        .select('nf,emissao,cliente_cod,cliente_nome,produto_cod,produto_desc,qtd,valor,cidade,uf,representante')
+        .order('emissao', { ascending:true })
+        .range(de, de + passo - 1);
+      if(error){ $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${error.message}</p></div>`; return; }
+      linhas.push(...data);
+      if(data.length < passo) break;
+    }
+    DADOS = linhas.map(r => ({...r, dt:new Date(r.emissao + 'T00:00:00Z'), valor:+r.valor, qtd:+r.qtd}));
+    montarAnos();
+    render();
+  }catch(err){
+    $('#main').innerHTML = '<div class="vazio"><h3>Não deu para ler o banco</h3><p>Falha de conexão. Recarregue a página e tente de novo.</p></div>';
   }
-  DADOS = linhas.map(r => ({...r, dt:new Date(r.emissao + 'T00:00:00Z'), valor:+r.valor, qtd:+r.qtd}));
-  montarAnos();
-  render();
 }
 
 /* ==========================================================
@@ -607,7 +621,9 @@ function montarAnos(){
 $('#btnPetmed').onclick = function(){
   PETMED_ON = !PETMED_ON;
   this.textContent = PETMED_ON ? 'Incluída' : 'Excluída';
-  this.style.color = PETMED_ON ? 'var(--tinta)' : 'var(--baixa)';
+  Object.assign(this.style, PETMED_ON
+    ? { background:'var(--azul)', borderColor:'var(--azul)', color:'#fff' }
+    : { background:'var(--carta)', borderColor:'var(--linha)', color:'var(--baixa)' });
   render();
 };
 
@@ -786,8 +802,8 @@ function secCarteira(B, ano, hoje, jan, filtroMes){
 
   const g = el('div','grade');
   g.appendChild(kpi('Carteira total', mil(todos.length), 'clientes com NF no histórico'));
-  g.appendChild(kpi('Ativos', mil(ativos.length), `${(ativos.length/todos.length*100).toFixed(0)}% da carteira`));
-  g.appendChild(kpi('Perdidos', mil(perdidos), `${(perdidos/todos.length*100).toFixed(0)}% da carteira`));
+  g.appendChild(kpi('Ativos', mil(ativos.length), `${todos.length ? (ativos.length/todos.length*100).toFixed(0) : 0}% da carteira`));
+  g.appendChild(kpi('Perdidos', mil(perdidos), `${todos.length ? (perdidos/todos.length*100).toFixed(0) : 0}% da carteira`));
   g.appendChild(kpi(`Novos em ${ano}`, mil(novos), 'primeira compra no ano'));
   s.appendChild(g);
   s.insertAdjacentHTML('beforeend',
