@@ -1124,28 +1124,52 @@ function donutABC(lista, tot, rotulo){
     fatias.push({ nome:'Outros', share: resto/tot*100, cor:'var(--grafite)' });
   }
 
-  const cx=100, cy=100, rE=88, rI=54;
+  // Percentual sem casa decimal em todo o gráfico. Arredondar pode
+  // fazer a soma dos rótulos dar 99% ou 101%; é o preço de ler rápido.
+  const p0 = v => Math.round(v) + '%';
+
+  // Área maior que o donut de propósito: fatia pequena não cabe rótulo
+  // dentro, então ele sai para fora e precisa de margem lateral.
+  const cx=125, cy=112, rE=84, rI=52;
+  const DENTRO = 8;   // % mínimo para o rótulo caber dentro da fatia
+  const MOSTRA = 2.5; // abaixo disso não rotula, só sobra no tooltip
   const pt = (a,r) => [cx + r*Math.cos(a), cy + r*Math.sin(a)];
   let ang = -Math.PI/2;
-  let svg = `<svg viewBox="0 0 200 200" role="img" aria-label="Participação dos maiores clientes no faturamento" style="max-width:220px;margin:0 auto;display:block">`;
+  let svg = `<svg viewBox="0 0 250 224" role="img" aria-label="Participação dos maiores clientes no faturamento" style="max-width:280px;margin:0 auto;display:block">`;
+  let rotulos = '';
   fatias.forEach(f => {
     const a0 = ang, a1 = ang + (f.share/100)*Math.PI*2;
     const grande = (a1-a0) > Math.PI ? 1 : 0;
     const [x0,y0]=pt(a0,rE), [x1,y1]=pt(a1,rE), [x2,y2]=pt(a1,rI), [x3,y3]=pt(a0,rI);
-    svg += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${rE},${rE} 0 ${grande} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${rI},${rI} 0 ${grande} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${f.cor}"><title>${f.nome}: ${f.share.toFixed(1).replace('.',',')}%</title></path>`;
+    svg += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${rE},${rE} 0 ${grande} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${rI},${rI} 0 ${grande} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${f.cor}"><title>${f.nome}: ${p0(f.share)}</title></path>`;
+
+    if(f.share >= MOSTRA){
+      const am = (a0+a1)/2;
+      if(f.share >= DENTRO){
+        const [lx,ly] = pt(am, (rE+rI)/2);
+        rotulos += `<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="#fff" pointer-events="none">${p0(f.share)}</text>`;
+      } else {
+        const [lx,ly] = pt(am, rE+13);
+        const cos = Math.cos(am);
+        const anc = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
+        rotulos += `<text x="${lx.toFixed(1)}" y="${(ly+3.5).toFixed(1)}" text-anchor="${anc}" font-family="IBM Plex Mono" font-size="10.5" font-weight="600" fill="var(--grafite)" pointer-events="none">${p0(f.share)}</text>`;
+      }
+    }
     ang = a1;
   });
-  svg += `<text x="${cx}" y="${cy-3}" text-anchor="middle" font-family="IBM Plex Mono" font-size="19" font-weight="600" fill="var(--tinta)">${fatias.length}</text>
-    <text x="${cx}" y="${cy+15}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="10" letter-spacing="0.08em" fill="var(--grafite)">${fatias.length===1?'FATIA':'FATIAS'}</text></svg>`;
+  svg += rotulos + '</svg>';
 
   const legenda = fatias.map(f =>
-    `<span><i style="background:${f.cor}"></i>${f.nome} · ${f.share.toFixed(1).replace('.',',')}%</span>`
+    `<span><i style="background:${f.cor}"></i>${f.nome} · <b style="font-family:var(--mono);font-weight:600;color:var(--tinta)">${p0(f.share)}</b></span>`
   ).join('');
 
   card.innerHTML = svg
-    + `<div class="leg" style="flex-direction:column;gap:6px;justify-content:center">${legenda}</div>`;
+    + `<div class="leg" style="flex-direction:column;gap:8px;justify-content:center;font-size:12.5px">${legenda}</div>`;
   card.insertAdjacentHTML('afterbegin',
-    `<div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite);margin-bottom:8px;text-align:center">Participação · ${rotulo}</div>`);
+    `<div style="text-align:center;margin-bottom:10px">
+       <div style="font-family:var(--cond);font-size:13.5px;font-weight:600;color:var(--tinta)">Participação de vendas por cliente</div>
+       <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tenue);margin-top:2px">${rotulo}</div>
+     </div>`);
   return card;
 }
 
