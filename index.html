@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CALMART · BI Comercial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================
+   CALMART BI · folha de estilo
+   Direção: painel de instrumento. Papel frio, tinta grafite,
+   números em mono tabular, azul industrial como único acento.
+   ========================================================== */
+:root{
+  --papel:#F5F7F9;
+  --carta:#FFFFFF;
+  --tinta:#0F1620;
+  --grafite:#5A6675;
+  --linha:#DCE2E8;
+  --azul:#1B4D89;
+  --azul-claro:#E3EDF8;
+  --alta:#0E7A5F;
+  --baixa:#B4322A;
+  --sinal:#C9821B;
+  --r:3px;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --cond:'IBM Plex Sans Condensed',system-ui,sans-serif;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--papel);color:var(--tinta);
+  font-family:var(--sans);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.alta{color:var(--alta)} .baixa{color:var(--baixa)}
+:focus-visible{outline:2px solid var(--azul);outline-offset:2px}
+
+/* ---------- login ---------- */
+#login{
+  min-height:100vh;display:grid;place-items:center;padding:24px;
+  background:
+    linear-gradient(var(--linha) 1px,transparent 1px) 0 0/100% 28px,
+    var(--papel);
+}
+.card-login{
+  width:100%;max-width:360px;background:var(--carta);
+  border:1px solid var(--linha);border-radius:var(--r);
+  padding:32px 28px;box-shadow:0 1px 2px rgba(15,22,32,.05);
+}
+.marca{font-family:var(--cond);font-weight:700;font-size:22px;letter-spacing:.14em;margin:0}
+.marca span{color:var(--azul)}
+.sub{color:var(--grafite);font-size:12px;letter-spacing:.09em;text-transform:uppercase;margin:6px 0 26px}
+label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--grafite);margin-bottom:5px}
+.campo{
+  width:100%;padding:9px 11px;border:1px solid var(--linha);border-radius:var(--r);
+  background:var(--carta);color:var(--tinta);margin-bottom:14px;
+}
+.campo:focus{border-color:var(--azul);outline:none}
+.btn{
+  background:var(--azul);color:#fff;border:1px solid var(--azul);
+  padding:9px 16px;border-radius:var(--r);font-weight:600;font-size:13px;
+}
+.btn:hover{background:#163f72}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-2{background:var(--carta);color:var(--tinta);border:1px solid var(--linha)}
+.btn-2:hover{background:var(--papel)}
+.btn-full{width:100%}
+.erro{color:var(--baixa);font-size:12.5px;min-height:18px;margin-top:10px}
+
+/* ---------- casca ---------- */
+#app{display:none}
+header{
+  position:sticky;top:0;z-index:40;background:var(--tinta);color:#fff;
+  padding:0 20px;display:flex;align-items:center;gap:18px;height:52px;
+}
+header .marca{font-size:15px;color:#fff}
+header .marca span{color:#7FB0E8}
+.dir{margin-left:auto;display:flex;align-items:center;gap:12px}
+.quem{font-size:12px;color:#9AA6B4;font-family:var(--mono)}
+.btn-h{background:transparent;border:1px solid #38444F;color:#fff;padding:6px 12px;border-radius:var(--r);font-size:12.5px}
+.btn-h:hover{background:#1C2733}
+.btn-h.on{background:var(--azul);border-color:var(--azul)}
+
+.barra{
+  position:sticky;top:52px;z-index:30;background:var(--carta);
+  border-bottom:1px solid var(--linha);padding:10px 20px;
+  display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap;
+}
+.ctrl label{margin-bottom:3px}
+.ctrl input,.ctrl select{padding:5px 8px;border:1px solid var(--linha);border-radius:var(--r);background:var(--carta)}
+.ctrl input{width:74px}
+.ref{margin-left:auto;font-size:11.5px;color:var(--grafite);font-family:var(--mono);text-align:right;line-height:1.4}
+
+main{max-width:1240px;margin:0 auto;padding:26px 20px 80px}
+
+/* ---------- seções ---------- */
+section{margin-bottom:34px}
+.cab{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;border-bottom:2px solid var(--tinta);padding-bottom:7px}
+h2{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.03em;margin:0;text-transform:uppercase}
+.tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--azul);border:1px solid var(--azul);padding:2px 6px;border-radius:2px}
+.nota{font-size:12px;color:var(--grafite);margin-top:10px;line-height:1.6}
+.nota b{color:var(--tinta)}
+
+/* ---------- cartões ---------- */
+.grade{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.kpi{background:var(--carta);border:1px solid var(--linha);border-radius:var(--r);padding:13px 15px}
+.kpi .rot{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite)}
+.kpi .val{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.03em;margin:5px 0 2px}
+.kpi .pe{font-size:11.5px;color:var(--grafite);font-family:var(--mono)}
+.chip{display:inline-block;font-family:var(--mono);font-size:11.5px;font-weight:600;padding:1px 6px;border-radius:2px}
+.chip.up{background:#E4F3EE;color:var(--alta)}
+.chip.down{background:#FBEAE8;color:var(--baixa)}
+
+/* ---------- painel/gráfico ---------- */
+.painel{background:var(--carta);border:1px solid var(--linha);border-radius:var(--r);padding:16px}
+svg{display:block;width:100%;height:auto}
+.leg{display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--grafite);margin-top:10px}
+.leg i{display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:-1px;border-radius:1px}
+
+/* ---------- tabelas ---------- */
+.rolo{overflow-x:auto;background:var(--carta);border:1px solid var(--linha);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  text-align:left;font-family:var(--cond);font-weight:600;font-size:11px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--grafite);
+  padding:9px 11px;border-bottom:1px solid var(--linha);white-space:nowrap;
+  position:sticky;top:0;background:var(--carta);
+}
+td{padding:8px 11px;border-bottom:1px solid #EDF1F4;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#F8FAFC}
+.d{text-align:right}
+.classe{font-family:var(--mono);font-size:11px;font-weight:600;padding:1px 5px;border-radius:2px}
+.cA{background:#DCE9F7;color:var(--azul)}
+.cB{background:#E9EDF1;color:var(--grafite)}
+.cC{background:#F2F4F6;color:#8A94A0}
+.pill{font-size:11px;font-family:var(--mono);padding:1px 6px;border-radius:2px}
+.pill.ok{background:#E4F3EE;color:var(--alta)}
+.pill.no{background:#FBEAE8;color:var(--baixa)}
+.pill.at{background:#FBF1E0;color:var(--sinal)}
+.abas{display:flex;gap:6px;margin-bottom:10px}
+.aba{border:1px solid var(--linha);background:var(--carta);padding:5px 12px;border-radius:var(--r);font-size:12.5px;color:var(--grafite)}
+.aba.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+
+/* ---------- vazio / modal ---------- */
+.vazio{background:var(--carta);border:1px dashed var(--linha);border-radius:var(--r);padding:52px 24px;text-align:center}
+.vazio h3{font-family:var(--cond);font-size:16px;letter-spacing:.05em;text-transform:uppercase;margin:0 0 8px}
+.vazio p{color:var(--grafite);max-width:460px;margin:0 auto 20px}
+.fundo{position:fixed;inset:0;background:rgba(15,22,32,.55);display:none;place-items:center;z-index:60;padding:20px}
+.fundo.on{display:grid}
+.modal{background:var(--carta);border-radius:var(--r);width:100%;max-width:520px;padding:26px}
+.modal h3{font-family:var(--cond);font-size:17px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 6px}
+.zona{border:1px dashed var(--linha);border-radius:var(--r);padding:26px;text-align:center;color:var(--grafite);margin:16px 0}
+.zona.dentro{border-color:var(--azul);background:var(--azul-claro)}
+.log{font-family:var(--mono);font-size:12px;background:var(--papel);border:1px solid var(--linha);border-radius:var(--r);padding:10px;max-height:150px;overflow:auto;white-space:pre-wrap;margin-top:12px}
+.fim{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+@media(max-width:640px){
+  .barra{gap:14px} main{padding:18px 12px 60px} .kpi .val{font-size:21px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <div class="card-login">
+    <h1 class="marca">CAL<span>MART</span></h1>
+    <p class="sub">BI Comercial</p>
+    <label for="email">E-mail</label>
+    <input id="email" class="campo" type="email" autocomplete="username">
+    <label for="senha">Senha</label>
+    <input id="senha" class="campo" type="password" autocomplete="current-password">
+    <button id="btnEntrar" class="btn btn-full">Entrar</button>
+    <p class="erro" id="erroLogin"></p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <header>
+    <span class="marca">CAL<span>MART</span></span>
+    <span style="font-size:12px;color:#9AA6B4;letter-spacing:.1em">BI COMERCIAL</span>
+    <div class="dir">
+      <span class="quem" id="quem"></span>
+      <button class="btn-h" id="btnImportar">Importar CSV</button>
+      <button class="btn-h" id="btnSair">Sair</button>
+    </div>
+  </header>
+
+  <div class="barra">
+    <div class="ctrl">
+      <label for="anoBase">Ano-base</label>
+      <select id="anoBase"></select>
+    </div>
+    <div class="ctrl">
+      <label for="meta">Meta de crescimento %</label>
+      <input id="meta" type="number" value="10" min="-50" max="200" step="1">
+    </div>
+    <div class="ctrl">
+      <label for="dias">Inativo após (dias)</label>
+      <input id="dias" type="number" value="120" min="30" max="720" step="15">
+    </div>
+    <div class="ctrl">
+      <label>Cliente PETMED</label>
+      <button class="btn-h on" id="btnPetmed" style="border-color:var(--linha);color:var(--tinta)">Incluída</button>
+    </div>
+    <div class="ref" id="ref"></div>
+  </div>
+
+  <main id="main"></main>
+</div>
+
+<!-- ============ MODAL DE IMPORTAÇÃO ============ -->
+<div class="fundo" id="fundo">
+  <div class="modal">
+    <h3>Importar RFNF613</h3>
+    <p style="color:var(--grafite);font-size:13px;margin:0">
+      Abra o XLSX do Senior no Excel, salve como CSV e escolha o arquivo aqui.
+      A carga substitui os dados anteriores.
+    </p>
+    <div class="zona" id="zona">
+      Arraste o CSV ou <label for="arquivo" style="display:inline;text-transform:none;letter-spacing:0;font-size:14px;color:var(--azul);cursor:pointer;text-decoration:underline">escolha um arquivo</label>
+      <input id="arquivo" type="file" accept=".csv,.txt" hidden>
+    </div>
+    <div class="log" id="log" style="display:none"></div>
+    <div class="fim">
+      <button class="btn btn-2" id="btnFechar">Fechar</button>
+      <button class="btn" id="btnGravar" disabled>Gravar no banco</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+/* ==========================================================
+   1. CONFIGURAÇÃO
+   Tudo que muda com regra de negócio mora aqui. Editar
+   este bloco não exige entender o resto do arquivo.
+   ========================================================== */
+const CONFIG = {
+  SUPABASE_URL : 'https://limkqsbhblbctpajzjdz.supabase.co',
+  SUPABASE_ANON: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpbWtxc2JoYmxiY3RwYWp6amR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDE3NjMsImV4cCI6MjEwMDM3Nzc2M30.MI-6648LdocP-lX7gqIO3WiMnHp7QoJYe65l3uE-n7o',
+
+  // Clientes tratados como venda indireta. Ficam de fora da cadência.
+  GALPAO_DROP: ['GALPAO DROP', 'GALPÃO DROP'],
+
+  // Cliente institucional que pode ser ligado/desligado no topo.
+  PETMED: ['PET MED', 'PETMED'],
+
+  // Grupos econômicos: CNPJs diferentes, mesmo dono.
+  // 'contem' casa por pedaço do nome, em maiúsculas.
+  GRUPOS: [
+    { nome:'NIPPO + LUNIM',            contem:['NIPPO','LUNIM'] },
+    { nome:'FABIANA + MASTER PET',     contem:['FABIANA','MASTER PET'] },
+    { nome:'DOGNIFICO + COMP. BR + SJR', contem:['DOGNIFICO','COMPONENTES BR','SJR'] }
+  ],
+
+  DIAS_INATIVO      : 120,  // sem compra além disso = perdido
+  META_CRESCIMENTO  : 10,   // % sobre o ano anterior
+  MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
+  ATRASO_MINIMO     : 21    // dias de atraso para entrar na worklist
+};
+
+/* ==========================================================
+   2. INFRA
+   ========================================================== */
+const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON);
+const $  = s => document.querySelector(s);
+const el = (t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n;};
+
+const brl = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const mil = v => (v||0).toLocaleString('pt-BR',{maximumFractionDigits:0});
+const pct = v => (v>=0?'+':'') + v.toFixed(1).replace('.',',') + '%';
+const dbr = d => d ? d.toLocaleDateString('pt-BR',{timeZone:'UTC'}) : '—';
+const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+let DADOS = [];            // linhas cruas vindas do banco
+let PENDENTE = null;       // linhas parseadas aguardando gravação
+let PETMED_ON = true;
+
+/* ==========================================================
+   3. LOGIN
+   ========================================================== */
+$('#btnEntrar').onclick = entrar;
+$('#senha').addEventListener('keydown', e => { if(e.key==='Enter') entrar(); });
+
+async function entrar(){
+  const b = $('#btnEntrar'); b.disabled = true; $('#erroLogin').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({
+    email: $('#email').value.trim(), password: $('#senha').value
+  });
+  b.disabled = false;
+  if(error){ $('#erroLogin').textContent = 'E-mail ou senha não conferem.'; return; }
+  abrir();
+}
+
+$('#btnSair').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+sb.auth.getSession().then(({data}) => { if(data.session) abrir(); });
+
+async function abrir(){
+  const { data:{ user } } = await sb.auth.getUser();
+  $('#quem').textContent = user?.email || '';
+  $('#login').style.display = 'none';
+  $('#app').style.display   = 'block';
+  await carregar();
+}
+
+/* ==========================================================
+   4. CARREGAR DO BANCO
+   PostgREST devolve no máximo 1000 linhas por vez, então
+   pagina até acabar.
+   ========================================================== */
+async function carregar(){
+  $('#main').innerHTML = '<div class="vazio"><h3>Carregando</h3><p>Buscando o faturamento no banco.</p></div>';
+  const linhas = []; const passo = 1000;
+  for(let de = 0; ; de += passo){
+    const { data, error } = await sb.from('nf_itens')
+      .select('nf,emissao,cliente_cod,cliente_nome,produto_cod,produto_desc,qtd,valor,cidade,uf,representante')
+      .order('emissao', { ascending:true })
+      .range(de, de + passo - 1);
+    if(error){ $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${error.message}</p></div>`; return; }
+    linhas.push(...data);
+    if(data.length < passo) break;
+  }
+  DADOS = linhas.map(r => ({...r, dt:new Date(r.emissao + 'T00:00:00Z'), valor:+r.valor, qtd:+r.qtd}));
+  montarAnos();
+  render();
+}
+
+/* ==========================================================
+   5. REGRAS DE NEGÓCIO
+   ========================================================== */
+function ehGrupo(nome){
+  const N = (nome||'').toUpperCase();
+  for(const g of CONFIG.GRUPOS) if(g.contem.some(c => N.includes(c))) return g.nome;
+  return null;
+}
+const ehDrop   = n => CONFIG.GALPAO_DROP.some(x => (n||'').toUpperCase().includes(x));
+const ehPetmed = n => CONFIG.PETMED.some(x => (n||'').toUpperCase().includes(x));
+
+// Aplica grupo econômico e o filtro PETMED. Devolve linhas com
+// clienteKey/clienteNome já consolidados.
+function base(){
+  return DADOS
+    .filter(r => PETMED_ON || !ehPetmed(r.cliente_nome))
+    .map(r => {
+      const g = ehGrupo(r.cliente_nome);
+      return {...r, ck: g || r.cliente_cod, cn: g || r.cliente_nome};
+    });
+}
+
+const dia = 86400000;
+const diasEntre = (a,b) => Math.round((b - a)/dia);
+function mediana(v){
+  const s=[...v].sort((a,b)=>a-b), m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+/* ==========================================================
+   6. RENDER
+   ========================================================== */
+function montarAnos(){
+  const anos = [...new Set(DADOS.map(r => r.dt.getUTCFullYear()))].sort((a,b)=>b-a);
+  const s = $('#anoBase');
+  if(s.options.length && anos.includes(+s.value)) return;
+  s.innerHTML = '';
+  anos.forEach(a => s.add(new Option(a, a)));
+}
+
+['#anoBase','#meta','#dias'].forEach(id => $(id).addEventListener('change', render));
+$('#btnPetmed').onclick = function(){
+  PETMED_ON = !PETMED_ON;
+  this.textContent = PETMED_ON ? 'Incluída' : 'Excluída';
+  this.style.color = PETMED_ON ? 'var(--tinta)' : 'var(--baixa)';
+  render();
+};
+
+function render(){
+  const m = $('#main');
+  if(!DADOS.length){
+    m.innerHTML = `<div class="vazio">
+      <h3>Nenhum dado no banco</h3>
+      <p>Extraia o RFNF613 no Senior, salve como CSV e use o botão Importar CSV no topo.
+         O dashboard monta tudo em seguida.</p>
+      <button class="btn" onclick="document.getElementById('fundo').classList.add('on')">Importar CSV</button>
+    </div>`;
+    $('#ref').textContent = '';
+    return;
+  }
+
+  const B    = base();
+  const ano  = +$('#anoBase').value;
+  const meta = +$('#meta').value / 100;
+  const jan  = +$('#dias').value;
+  const hoje = new Date(Math.max(...B.map(r => r.dt)));   // referência = última NF da base
+
+  $('#ref').innerHTML = `referência ${dbr(hoje)}<br>${mil(B.length)} itens · ${mil(new Set(B.map(r=>r.nf+r.emissao)).size)} NFs`;
+
+  m.innerHTML = '';
+  m.appendChild(secFaturamento(B, ano, meta));
+  m.appendChild(secCarteira(B, ano, hoje, jan));
+  m.appendChild(secABC(B, ano, hoje, jan));
+  m.appendChild(secCompradores(B, ano));
+  m.appendChild(secPerdidos(B, hoje, jan));
+  m.appendChild(secCadencia(B, hoje));
+}
+
+function cabecalho(pai, titulo, tag){
+  const c = el('div','cab');
+  c.appendChild(el('h2',null,titulo));
+  if(tag) c.appendChild(el('span','tag',tag));
+  pai.appendChild(c);
+}
+function kpi(rot, val, pe, delta){
+  const k = el('div','kpi');
+  k.appendChild(el('div','rot',rot));
+  k.appendChild(el('div','val',val));
+  const p = el('div','pe');
+  if(delta != null){
+    const c = el('span','chip ' + (delta>=0?'up':'down'), pct(delta));
+    p.appendChild(c); p.appendChild(document.createTextNode(' ' + (pe||'')));
+  } else p.textContent = pe || '';
+  k.appendChild(p);
+  return k;
+}
+
+/* ---------- 6.1 faturamento mensal ---------- */
+function secFaturamento(B, ano, meta){
+  const s = el('section');
+  cabecalho(s, 'Faturamento mensal', 'direção');
+
+  const A = new Array(12).fill(0), P = new Array(12).fill(0);
+  B.forEach(r => {
+    const y = r.dt.getUTCFullYear(), i = r.dt.getUTCMonth();
+    if(y === ano)   A[i] += r.valor;
+    if(y === ano-1) P[i] += r.valor;
+  });
+  const ultimo = Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth()));
+  const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+  const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+  const dif  = accP ? (accA/accP - 1)*100 : 0;
+
+  const g = el('div','grade');
+  g.appendChild(kpi(`Acumulado ${ano}`, brl(accA), `até ${MES[ultimo]}`));
+  g.appendChild(kpi(`Acumulado ${ano-1}`, brl(accP), 'mesmos meses'));
+  g.appendChild(kpi('Variação sobre o ano anterior', pct(dif), 'acumulado', dif));
+  g.appendChild(kpi('Meta do acumulado', brl(accP*(1+meta)), accA >= accP*(1+meta) ? 'atingida' : 'faltam ' + brl(accP*(1+meta)-accA)));
+  s.appendChild(g);
+
+  const p = el('div','painel'); p.style.marginTop = '12px';
+  p.innerHTML = barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano);
+  p.insertAdjacentHTML('beforeend',
+    `<div class="leg">
+      <span><i style="background:var(--azul)"></i>${ano}</span>
+      <span><i style="background:#B9C6D4"></i>${ano-1}</span>
+      <span><i style="background:var(--sinal)"></i>meta (${ano-1} +${(meta*100).toFixed(0)}%)</span>
+      <span>barra clara = mês em curso, ainda parcial</span>
+    </div>`);
+  s.appendChild(p);
+  return s;
+}
+
+function barrasDuplas(A, P, M, ultimo, ano){
+  const W=1160,H=300,e=64,d=16,t=22,b=34;
+  const max = Math.max(...A, ...P, ...M, 1)*1.12;
+  const lg = (W-e-d)/12, y = v => t + (H-t-b)*(1 - v/max);
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal comparado">`;
+  for(let i=0;i<=4;i++){
+    const v = max*i/4, yy = y(v);
+    g += `<line x1="${e}" y1="${yy}" x2="${W-d}" y2="${yy}" stroke="#EDF1F4"/>
+          <text x="${e-8}" y="${yy+4}" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#8A94A0">${Math.round(v/1000)}k</text>`;
+  }
+  for(let i=0;i<12;i++){
+    const x = e + i*lg, w = lg*0.30;
+    if(P[i]>0) g += `<rect x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#B9C6D4"/>`;
+    if(A[i]>0) g += `<rect x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo?0.45:1}"/>`;
+    if(M[i]>0) g += `<line x1="${x+lg*0.46}" y1="${y(M[i])}" x2="${x+lg*0.86}" y2="${y(M[i])}" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    g += `<text x="${x+lg/2}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="11" fill="#5A6675">${MES[i]}</text>`;
+  }
+  g += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#0F1620"/></svg>`;
+  return g;
+}
+
+/* ---------- 6.2 carteira ---------- */
+function secCarteira(B, ano, hoje, jan){
+  const s = el('section');
+  cabecalho(s, 'Carteira de clientes');
+
+  const ult = {}, pri = {};
+  B.forEach(r => {
+    if(!ult[r.ck] || r.dt > ult[r.ck]) ult[r.ck] = r.dt;
+    if(!pri[r.ck] || r.dt < pri[r.ck]) pri[r.ck] = r.dt;
+  });
+  const todos   = Object.keys(ult);
+  const ativos  = todos.filter(k => diasEntre(ult[k], hoje) <= jan);
+  const perdidos= todos.length - ativos.length;
+  const novos   = todos.filter(k => pri[k].getUTCFullYear() === ano).length;
+
+  const g = el('div','grade');
+  g.appendChild(kpi('Carteira total', mil(todos.length), 'clientes com NF no histórico'));
+  g.appendChild(kpi('Ativos', mil(ativos.length), `${(ativos.length/todos.length*100).toFixed(0)}% da carteira`));
+  g.appendChild(kpi('Perdidos', mil(perdidos), `${(perdidos/todos.length*100).toFixed(0)}% da carteira`));
+  g.appendChild(kpi(`Novos em ${ano}`, mil(novos), 'primeira compra no ano'));
+  s.appendChild(g);
+  s.insertAdjacentHTML('beforeend',
+    `<p class="nota"><b>Regra única:</b> ativo = comprou nos últimos ${jan} dias. Perdido = não comprou.
+     Total = ativos + perdidos, sempre fecha. Sem zona cinzenta.</p>`);
+  return s;
+}
+
+/* ---------- 6.3 curva ABC ---------- */
+function secABC(B, ano, hoje, jan){
+  const s = el('section');
+  cabecalho(s, `Maiores clientes · curva ABC ${ano}`, 'pareto');
+
+  const doAno = B.filter(r => r.dt.getUTCFullYear() === ano);
+  const m = {};
+  doAno.forEach(r => {
+    m[r.ck] = m[r.ck] || { nome:r.cn, fat:0, nfs:new Set() };
+    m[r.ck].fat += r.valor; m[r.ck].nfs.add(r.nf + r.emissao);
+  });
+  const ultGeral = {};
+  B.forEach(r => { if(!ultGeral[r.ck] || r.dt > ultGeral[r.ck]) ultGeral[r.ck] = r.dt; });
+
+  const lista = Object.entries(m).map(([k,v]) => ({k, ...v})).sort((a,b)=>b.fat-a.fat);
+  const tot = lista.reduce((a,b)=>a+b.fat,0);
+  let acc = 0;
+  lista.forEach(c => { acc += c.fat; c.acc = acc/tot*100; c.share = c.fat/tot*100;
+    c.classe = c.acc <= 80 ? 'A' : c.acc <= 95 ? 'B' : 'C'; });
+
+  const nA = lista.filter(c=>c.classe==='A').length;
+  const g = el('div','grade');
+  g.appendChild(kpi('Faturamento no ano', brl(tot), `${lista.length} clientes compradores`));
+  g.appendChild(kpi('Clientes classe A', mil(nA), '80% do faturamento'));
+  g.appendChild(kpi('Concentração no top 5', (lista.slice(0,5).reduce((a,b)=>a+b.share,0)).toFixed(1).replace('.',',')+'%', 'do faturamento do ano'));
+  s.appendChild(g);
+
+  const r = el('div','rolo'); r.style.marginTop='12px'; r.style.maxHeight='460px'; r.style.overflowY='auto';
+  let h = `<table><thead><tr>
+    <th>#</th><th>Classe</th><th>Cliente</th><th class="d">Faturamento</th>
+    <th class="d">% total</th><th class="d">% acum.</th><th class="d">NFs</th>
+    <th>Última compra</th><th>Situação</th></tr></thead><tbody>`;
+  lista.forEach((c,i) => {
+    const dd = diasEntre(ultGeral[c.k], hoje);
+    h += `<tr>
+      <td class="num">${i+1}</td>
+      <td><span class="classe c${c.classe}">${c.classe}</span></td>
+      <td>${c.nome}</td>
+      <td class="d num">${brl(c.fat)}</td>
+      <td class="d num">${c.share.toFixed(1).replace('.',',')}%</td>
+      <td class="d num">${c.acc.toFixed(1).replace('.',',')}%</td>
+      <td class="d num">${c.nfs.size}</td>
+      <td class="num">${dbr(ultGeral[c.k])}</td>
+      <td><span class="pill ${dd<=jan?'ok':'no'}">${dd<=jan?'ativo':dd+' dias'}</span></td>
+    </tr>`;
+  });
+  r.innerHTML = h + '</tbody></table>';
+  s.appendChild(r);
+  s.insertAdjacentHTML('beforeend',
+    `<p class="nota"><b>A</b> = 80% do faturamento · <b>B</b> = próximos 15% · <b>C</b> = últimos 5%.
+     Foco: blindar os A e converter B em A. Grupos econômicos aparecem somados, para não subestimar
+     a dependência de poucos donos reais.</p>`);
+  return s;
+}
+
+/* ---------- 6.4 clientes compradores por mês ---------- */
+function secCompradores(B, ano){
+  const s = el('section');
+  cabecalho(s, 'Clientes compradores', 'unidades');
+
+  const cont = (y) => {
+    const mes = Array.from({length:12}, () => new Set()), tot = new Set();
+    B.filter(r => r.dt.getUTCFullYear() === y).forEach(r => {
+      mes[r.dt.getUTCMonth()].add(r.ck); tot.add(r.ck);
+    });
+    return { mes: mes.map(x=>x.size), tot: tot.size };
+  };
+  const a = cont(ano), p = cont(ano-1);
+  const ultimo = a.mes.reduce((u,v,i) => v>0 ? i : u, 0);
+  const dif = p.tot ? (a.tot/p.tot - 1)*100 : 0;
+
+  const g = el('div','grade');
+  g.appendChild(kpi(`Compradores em ${ano}`, mil(a.tot), 'clientes distintos no ano'));
+  g.appendChild(kpi(`Compradores em ${ano-1}`, mil(p.tot), 'ano inteiro'));
+  g.appendChild(kpi('Variação', pct(dif), 'sobre o ano anterior', dif));
+  s.appendChild(g);
+
+  const pn = el('div','painel'); pn.style.marginTop='12px';
+  const W=1160,H=210,e=44,d=16,t=18,b=30;
+  const max = Math.max(...a.mes, ...p.mes, 1)*1.2, lg=(W-e-d)/12;
+  const y = v => t + (H-t-b)*(1 - v/max);
+  let sv = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Clientes compradores por mês">`;
+  for(let i=0;i<12;i++){
+    const x = e+i*lg, w = lg*0.30;
+    if(p.mes[i]) sv += `<rect x="${x+lg*0.16}" y="${y(p.mes[i])}" width="${w}" height="${H-b-y(p.mes[i])}" fill="#B9C6D4"/>`;
+    if(a.mes[i]) sv += `<rect x="${x+lg*0.50}" y="${y(a.mes[i])}" width="${w}" height="${H-b-y(a.mes[i])}" fill="var(--azul)" opacity="${i===ultimo?0.45:1}"/>
+      <text x="${x+lg*0.65}" y="${y(a.mes[i])-5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5A6675">${a.mes[i]}</text>`;
+    sv += `<text x="${x+lg/2}" y="${H-10}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="11" fill="#5A6675">${MES[i]}</text>`;
+  }
+  sv += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#0F1620"/></svg>`;
+  pn.innerHTML = sv;
+  s.appendChild(pn);
+  s.insertAdjacentHTML('beforeend',
+    `<p class="nota">Cada barra conta clientes únicos <b>naquele mês</b>. Quem compra em três meses
+     aparece nas três barras, mas conta uma vez só no acumulado do ano.</p>`);
+  return s;
+}
+
+/* ---------- 6.5 perdidos ---------- */
+function secPerdidos(B, hoje, jan){
+  const s = el('section');
+  cabecalho(s, 'Clientes perdidos', 'comercial');
+
+  const m = {};
+  B.forEach(r => {
+    m[r.ck] = m[r.ck] || { nome:r.cn, fat:0, ult:r.dt };
+    m[r.ck].fat += r.valor;
+    if(r.dt > m[r.ck].ult) m[r.ck].ult = r.dt;
+  });
+  const lista = Object.values(m)
+    .map(c => ({...c, dias: diasEntre(c.ult, hoje)}))
+    .filter(c => c.dias > jan)
+    .sort((a,b) => b.fat - a.fat);
+
+  const g = el('div','grade');
+  g.appendChild(kpi('Clientes perdidos', mil(lista.length), `sem compra há mais de ${jan} dias`));
+  g.appendChild(kpi('Faturamento histórico parado', brl(lista.reduce((a,b)=>a+b.fat,0)), 'valor total desses clientes'));
+  g.appendChild(kpi('Maior perda isolada', lista.length ? brl(lista[0].fat) : '—', lista.length ? lista[0].nome : ''));
+  s.appendChild(g);
+
+  const r = el('div','rolo'); r.style.marginTop='12px'; r.style.maxHeight='400px'; r.style.overflowY='auto';
+  let h = `<table><thead><tr><th>Cliente</th><th class="d">Faturamento histórico</th>
+    <th>Última compra</th><th class="d">Dias sem comprar</th></tr></thead><tbody>`;
+  lista.forEach(c => {
+    h += `<tr><td>${c.nome}</td><td class="d num">${brl(c.fat)}</td>
+      <td class="num">${dbr(c.ult)}</td>
+      <td class="d num" style="color:var(--baixa)">${c.dias}</td></tr>`;
+  });
+  r.innerHTML = h + '</tbody></table>';
+  s.appendChild(r);
+  s.insertAdjacentHTML('beforeend',
+    `<p class="nota">Ordenado por faturamento histórico: quem pesa mais no bolso aparece primeiro,
+     não quem sumiu há mais tempo.</p>`);
+  return s;
+}
+
+/* ---------- 6.6 cadência ---------- */
+function secCadencia(B, hoje){
+  const s = el('section');
+  cabecalho(s, 'Retomada por cadência', 'worklist');
+
+  const m = {};
+  B.forEach(r => {
+    if(ehDrop(r.cn)) return;
+    m[r.ck] = m[r.ck] || { nome:r.cn, datas:new Set(), r12:0 };
+    m[r.ck].datas.add(r.emissao);
+    if(diasEntre(r.dt, hoje) <= 365) m[r.ck].r12 += r.valor;
+  });
+
+  const linhas = [];
+  Object.values(m).forEach(c => {
+    const ds = [...c.datas].map(x => new Date(x+'T00:00:00Z')).sort((a,b)=>a-b);
+    if(ds.length < CONFIG.MIN_COMPRAS_RITMO) return;
+    const gaps = ds.slice(1).map((d,i) => diasEntre(ds[i], d));
+    const ritmo = Math.round(mediana(gaps));
+    const ult = ds[ds.length-1];
+    const semComprar = diasEntre(ult, hoje);
+    linhas.push({ nome:c.nome, ritmo, n:ds.length, ult, semComprar,
+                  atraso: semComprar - ritmo, r12:c.r12 });
+  });
+
+  const comRitmo = linhas.length;
+  let corte = CONFIG.ATRASO_MINIMO;
+  const abas = el('div','abas');
+
+  const pnKpi = el('div','grade');
+  s.appendChild(pnKpi);
+  s.appendChild(abas);
+  const rolo = el('div','rolo'); rolo.style.maxHeight='440px'; rolo.style.overflowY='auto';
+  s.appendChild(rolo);
+
+  function pintar(){
+    const fila = linhas.filter(l => l.atraso >= corte).sort((a,b) => b.r12 - a.r12);
+    pnKpi.innerHTML = '';
+    pnKpi.appendChild(kpi('Clientes com cadência medível', mil(comRitmo), `${CONFIG.MIN_COMPRAS_RITMO}+ compras`));
+    pnKpi.appendChild(kpi('Na hora de ligar', mil(fila.length), `atraso de ${corte} dias ou mais`));
+    pnKpi.appendChild(kpi('Receita de 12 meses na fila', brl(fila.reduce((a,b)=>a+b.r12,0)), 'peso financeiro desses clientes'));
+
+    let h = `<table><thead><tr><th>Cliente</th><th class="d">Compra a cada</th><th class="d">Compras</th>
+      <th>Última compra</th><th class="d">Dias sem comprar</th><th class="d">Atraso</th>
+      <th class="d">Receita 12m</th></tr></thead><tbody>`;
+    if(!fila.length) h += `<tr><td colspan="7" style="color:var(--grafite);padding:24px;text-align:center">Ninguém atrasado nesse corte. Aumente o corte ou comemore.</td></tr>`;
+    fila.forEach(l => {
+      h += `<tr><td>${l.nome}</td>
+        <td class="d num">${l.ritmo} d</td>
+        <td class="d num">${l.n}</td>
+        <td class="num">${dbr(l.ult)}</td>
+        <td class="d num">${l.semComprar}</td>
+        <td class="d"><span class="pill at">+${l.atraso} d</span></td>
+        <td class="d num">${brl(l.r12)}</td></tr>`;
+    });
+    rolo.innerHTML = h + '</tbody></table>';
+    [...abas.children].forEach(b => b.classList.toggle('on', +b.dataset.v === corte));
+  }
+
+  [21,30,45].forEach(v => {
+    const b = el('button','aba', `${v} dias ou mais`);
+    b.dataset.v = v;
+    b.onclick = () => { corte = v; pintar(); };
+    abas.appendChild(b);
+  });
+  pintar();
+
+  s.insertAdjacentHTML('beforeend',
+    `<p class="nota"><b>Como ler:</b> "compra a cada" é a mediana do intervalo entre as compras
+     <b>daquele cliente</b>, então se adapta a quem compra semanal, mensal ou trimestral, sem faixa fixa.
+     "Atraso" é quantos dias passaram além do ponto em que a próxima compra era esperada.
+     Não é nota de cliente, é lembrete de ligação. Ficam de fora o Galpão Drop e quem tem menos de
+     ${CONFIG.MIN_COMPRAS_RITMO} compras, porque aí não dá para medir ritmo.</p>`);
+  return s;
+}
+
+/* ==========================================================
+   7. IMPORTAÇÃO DO CSV
+   O RFNF613 sai com linhas de cabeçalho de página, de
+   representante e de cidade misturadas aos dados. O parser
+   abaixo reproduz exatamente esse formato.
+   ========================================================== */
+const fundo = $('#fundo');
+$('#btnImportar').onclick = () => { fundo.classList.add('on'); };
+$('#btnFechar').onclick   = () => { fundo.classList.remove('on'); };
+fundo.onclick = e => { if(e.target === fundo) fundo.classList.remove('on'); };
+
+const zona = $('#zona');
+['dragenter','dragover'].forEach(e => zona.addEventListener(e, ev => { ev.preventDefault(); zona.classList.add('dentro'); }));
+['dragleave','drop'].forEach(e => zona.addEventListener(e, ev => { ev.preventDefault(); zona.classList.remove('dentro'); }));
+zona.addEventListener('drop', ev => { if(ev.dataTransfer.files[0]) ler(ev.dataTransfer.files[0]); });
+$('#arquivo').onchange = ev => { if(ev.target.files[0]) ler(ev.target.files[0]); };
+
+function diz(txt){ const l = $('#log'); l.style.display='block'; l.textContent += txt + '\n'; l.scrollTop = l.scrollHeight; }
+
+// O Excel grava CSV ora em UTF-8, ora em Windows-1252, dependendo da
+// opção escolhida. Tenta UTF-8 e cai para 1252 se aparecer lixo.
+function decodificar(buffer){
+  const utf = new TextDecoder('utf-8').decode(buffer);
+  const lixo = (utf.match(/\uFFFD/g) || []).length;
+  if(lixo === 0) return utf;
+  return new TextDecoder('windows-1252').decode(buffer);
+}
+
+function ler(file){
+  $('#log').textContent = ''; PENDENTE = null; $('#btnGravar').disabled = true;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try{
+      const linhas = parseRFNF613(decodificar(fr.result));
+      if(!linhas.length){ diz('Nenhuma linha de faturamento reconhecida. Confira se o CSV é mesmo o RFNF613.'); return; }
+      const datas = linhas.map(l => l.emissao).sort();
+      PENDENTE = { nome:file.name, linhas };
+      diz(`Arquivo: ${file.name}`);
+      diz(`Linhas de item: ${mil(linhas.length)}`);
+      diz(`Período: ${datas[0]} a ${datas[datas.length-1]}`);
+      diz(`NFs: ${mil(new Set(linhas.map(l=>l.nf+l.emissao)).size)}`);
+      diz(`Clientes: ${mil(new Set(linhas.map(l=>l.cliente_cod)).size)}`);
+      diz(`Faturamento: ${brl(linhas.reduce((a,b)=>a+b.valor,0))}`);
+      diz('Confira os números acima. Se baterem com o Senior, grave.');
+      $('#btnGravar').disabled = false;
+    }catch(err){ diz('Não deu para ler o arquivo: ' + err.message); }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+function parseRFNF613(txt){
+  const cru = txt.split(/\r?\n/);
+  // delimitador: Excel em pt-BR usa ponto e vírgula
+  const amostra = cru.slice(0,40).join('\n');
+  const sep = (amostra.split(';').length > amostra.split(',').length) ? ';' : ',';
+  const decimalVirgula = sep === ';';
+
+  const num = s => {
+    if(s == null) return 0;
+    let v = String(s).trim().replace(/\s/g,'');
+    if(!v || v === '-') return 0;
+    v = decimalVirgula ? v.replace(/\./g,'').replace(',','.') : v.replace(/,/g,'');
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  };
+  const data = s => {
+    const v = String(s||'').trim();
+    if(/^\d{1,5}$/.test(v)){                       // serial do Excel
+      const d = new Date(Date.UTC(1899,11,30) + (+v)*86400000);
+      return d.toISOString().slice(0,10);
+    }
+    let m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/aaaa
+    if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+    m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);        // aaaa-mm-dd
+    if(m) return m[0];
+    return null;
+  };
+
+  const out = []; let rep = null, cidade = null, uf = null;
+  for(const linha of cru){
+    if(!linha.trim()) continue;
+    const c = dividir(linha, sep);
+    const a = (c[0]||'').trim();
+
+    if(a === 'Representante:'){ rep = (c[3]||'').trim() || null; continue; }
+    if(a === 'Cidade:'){ cidade = (c[1]||'').trim() || null; uf = (c[5]||'').trim() || null; continue; }
+    if(!/^\d+$/.test(a)) continue;                 // cabeçalho de página, rodapé, etc.
+    const dt = data(c[1]); if(!dt) continue;
+    const valor = num(c[14]); if(!valor) continue;
+
+    out.push({
+      nf: a, emissao: dt,
+      cliente_cod : (c[2] ||'').trim(),
+      cliente_nome: (c[3] ||'').trim(),
+      produto_cod : (c[5] ||'').trim() || null,
+      derivacao   : (c[6] ||'').trim() || null,
+      produto_desc: (c[8] ||'').trim() || null,
+      cond_pgto   : (c[9] ||'').trim() || null,
+      qtd         : num(c[10]),
+      um          : (c[11]||'').trim() || null,
+      preco_unit  : num(c[12]),
+      valor,
+      transportadora:(c[17]||'').trim() || null,
+      representante: rep, cidade, uf
+    });
+  }
+  return out;
+}
+
+// divisor de CSV que respeita aspas
+function dividir(linha, sep){
+  const out = []; let atual = '', aspas = false;
+  for(let i=0;i<linha.length;i++){
+    const ch = linha[i];
+    if(ch === '"'){
+      if(aspas && linha[i+1] === '"'){ atual += '"'; i++; }
+      else aspas = !aspas;
+    } else if(ch === sep && !aspas){ out.push(atual); atual = ''; }
+    else atual += ch;
+  }
+  out.push(atual);
+  return out;
+}
+
+/* ---------- gravar ---------- */
+$('#btnGravar').onclick = async function(){
+  if(!PENDENTE) return;
+  this.disabled = true; $('#btnFechar').disabled = true;
+  const { data:{ user } } = await sb.auth.getUser();
+  const datas = PENDENTE.linhas.map(l => l.emissao).sort();
+  let novaId = null;
+
+  try{
+    diz('Registrando a importação.');
+    const { data:imp, error:e1 } = await sb.from('importacoes').insert({
+      arquivo: PENDENTE.nome, linhas: PENDENTE.linhas.length,
+      periodo_ini: datas[0], periodo_fim: datas[datas.length-1],
+      usuario_id: user.id, usuario_email: user.email
+    }).select().single();
+    if(e1) throw e1;
+    novaId = imp.id;
+
+    const passo = 500;
+    for(let i=0;i<PENDENTE.linhas.length;i+=passo){
+      const lote = PENDENTE.linhas.slice(i,i+passo).map(l => ({...l, importacao_id: novaId}));
+      const { error:e2 } = await sb.from('nf_itens').insert(lote);
+      if(e2) throw e2;
+      diz(`Gravadas ${mil(Math.min(i+passo, PENDENTE.linhas.length))} de ${mil(PENDENTE.linhas.length)} linhas.`);
+    }
+
+    diz('Removendo a carga anterior.');
+    const { error:e3 } = await sb.from('importacoes').delete().neq('id', novaId);
+    if(e3) throw e3;
+
+    diz('Pronto. Atualizando o dashboard.');
+    PENDENTE = null;
+    fundo.classList.remove('on');
+    await carregar();
+  }catch(err){
+    diz('Falhou: ' + (err.message || err));
+    if(novaId){
+      await sb.from('importacoes').delete().eq('id', novaId);
+      diz('A carga parcial foi desfeita. Os dados anteriores continuam intactos.');
+    }
+  }finally{
+    this.disabled = false; $('#btnFechar').disabled = false;
+  }
+};
+</script>
+</body>
+</html>
