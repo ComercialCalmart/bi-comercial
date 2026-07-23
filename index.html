@@ -286,6 +286,7 @@ const MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','
 let DADOS = [];            // linhas cruas vindas do banco
 let PENDENTE = null;       // linhas parseadas aguardando gravação
 let PETMED_ON = true;
+let PODE_IMPORTAR = false;  // definido no login, a partir da tabela perfis
 
 /* ==========================================================
    3. LOGIN
@@ -312,6 +313,14 @@ async function abrir(){
   $('#quem').textContent = user?.email || '';
   $('#login').style.display = 'none';
   $('#app').style.display   = 'block';
+
+  // Só quem tem pode_importar vê o botão de importação. A trava real
+  // está na RLS do banco; esconder o botão é só para não confundir.
+  const { data:perfil } = await sb.from('perfis')
+    .select('pode_importar').eq('usuario_id', user.id).maybeSingle();
+  PODE_IMPORTAR = perfil?.pode_importar === true;
+  $('#btnImportar').style.display = PODE_IMPORTAR ? '' : 'none';
+
   await carregar();
 }
 
@@ -388,12 +397,18 @@ $('#btnPetmed').onclick = function(){
 function render(){
   const m = $('#main');
   if(!DADOS.length){
-    m.innerHTML = `<div class="vazio">
-      <h3>Nenhum dado no banco</h3>
-      <p>Extraia o RFNF613 no Senior, salve como CSV e use o botão Importar CSV no topo.
-         O dashboard monta tudo em seguida.</p>
-      <button class="btn" onclick="document.getElementById('fundo').classList.add('on')">Importar CSV</button>
-    </div>`;
+    m.innerHTML = PODE_IMPORTAR
+      ? `<div class="vazio">
+          <h3>Nenhum dado no banco</h3>
+          <p>Extraia o RFNF613 no Senior, salve como CSV e use o botão Importar CSV no topo.
+             O dashboard monta tudo em seguida.</p>
+          <button class="btn" onclick="document.getElementById('fundo').classList.add('on')">Importar CSV</button>
+        </div>`
+      : `<div class="vazio">
+          <h3>Nenhum dado no banco</h3>
+          <p>A base ainda não foi carregada nesta semana. Avise quem cuida da importação
+             e recarregue a página em seguida.</p>
+        </div>`;
     $('#ref').textContent = '';
     return;
   }
