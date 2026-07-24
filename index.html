@@ -275,13 +275,34 @@ header .marca span{color:var(--menta)}
 .status-atencao .ritmo-chip{background:rgba(255,193,110,.2);color:#FFC16E}
 .status-baixa .ritmo-chip{background:rgba(255,158,147,.2);color:#FF9E93}
 
+/* Cabeçalho do bloco de meta: rótulo à esquerda, abas Ano/Mês à
+   direita. Só existe nesse bloco (os outros dois usam .resumo-label
+   sozinho), então a margem que empurra o valor pra baixo mora aqui,
+   não em .resumo-label — evita dobrar o espaço quando os dois convivem. */
+.meta-cabecalho{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.meta-cabecalho .resumo-label{margin-bottom:0}
+.meta-abas{display:flex;gap:4px;flex:0 0 auto}
+.meta-aba{
+  font-family:var(--cond);font-size:9.5px;font-weight:600;letter-spacing:.03em;
+  text-transform:uppercase;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);
+  border:none;padding:4px 11px;border-radius:100px;cursor:pointer;
+  transition:background .14s var(--curva),color .14s var(--curva);
+}
+.meta-aba:hover{background:rgba(255,255,255,.14);color:rgba(255,255,255,.85)}
+.meta-aba.on{background:rgba(255,255,255,.18);color:#fff}
+
 @media(max-width:780px){
   .resumo-grade{grid-template-columns:1fr;gap:20px}
   .resumo-bloco{padding:0 0 18px!important;border:none!important}
   .resumo-bloco:not(:last-child){border-bottom:1px solid rgba(255,255,255,.12)!important}
   .resumo-bloco:last-child{padding-bottom:0!important}
 }
-@media(max-width:640px){ .resumo{padding:20px 20px 22px} .resumo-valor{font-size:25px} }
+@media(max-width:640px){
+  .resumo{padding:20px 20px 22px}
+  .resumo-valor{font-size:25px}
+  .meta-abas{width:100%;margin-top:8px;gap:6px}
+  .meta-aba{flex:1;min-height:38px;display:flex;align-items:center;justify-content:center;font-size:11px}
+}
 
 /* ---------- dica de interação ---------- */
 .dica{
@@ -863,6 +884,7 @@ let PETMED_ON = true;
 let PODE_IMPORTAR = false;  // definido no login, a partir da tabela perfis
 let FILTRO_MES = null;      // {ano, mes} quando uma coluna do gráfico está selecionada
 let CORTE_CADENCIA = CONFIG.ATRASO_MINIMO; // aba de dias escolhida em Cadência, sobrevive a qualquer re-render
+let RESUMO_PERIODO = 'ano'; // aba do bloco de meta no Resumo: 'ano' ou 'mes', sobrevive a qualquer re-render
 
 // Estado de ordenação por clique de cabeçalho, um por tabela. col=null
 // significa "usa a ordem padrão de cada seção" (a que já fazia sentido
@@ -1046,6 +1068,15 @@ $('#main').addEventListener('click', e => {
   const mes = +alvo.dataset.mes, ano = +alvo.dataset.ano;
   FILTRO_MES = (FILTRO_MES && FILTRO_MES.mes === mes && FILTRO_MES.ano === ano)
     ? null : { mes, ano };
+  render();
+});
+
+// Abas Ano/Mês do bloco de meta no Resumo — mesmo padrão de estado
+// persistido dos outros filtros: muda a variável, refaz o render inteiro.
+$('#main').addEventListener('click', e => {
+  const btn = e.target.closest('[data-periodo-meta]');
+  if(!btn) return;
+  RESUMO_PERIODO = btn.dataset.periodoMeta;
   render();
 });
 
@@ -1411,16 +1442,19 @@ function blocoResumo(status, label, valor, unidade, contextoHtml){
 // número grande, contexto — só que com barra de progresso e uma linha de
 // ritmo a mais. Só existe pra esse bloco porque só ele tem meta contra
 // a qual progredir; os outros dois são contagens, não perseguição de alvo.
-function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra){
+function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra, abasHtml){
   const b = el('div', 'resumo-bloco resumo-meta status-' + status);
+  const cab = el('div','meta-cabecalho');
   const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
+  cab.appendChild(lab);
+  if(abasHtml){ cab.insertAdjacentHTML('beforeend', abasHtml); }
   const val = el('div','resumo-valor'); val.textContent = valor;
   const barra = el('div','meta-barra');
   const fill = el('div','meta-barra-fill');
   fill.style.width = Math.min(Math.max(pct,0),100) + '%';
   barra.appendChild(fill);
   const linha = el('div','meta-linha'); linha.innerHTML = linhaMeta;
-  b.append(lab, val, barra, linha);
+  b.append(cab, val, barra, linha);
   if(linhaRitmo){ const rt = el('div','meta-ritmo'); rt.innerHTML = linhaRitmo; b.appendChild(rt); }
   if(contextoExtra){ const cx = el('div','resumo-contexto'); cx.style.marginTop='8px'; cx.innerHTML = contextoExtra; b.appendChild(cx); }
   return b;
@@ -1437,11 +1471,11 @@ function secResumo(B, ano, meta, jan, hoje){
   div.appendChild(el('span','rot-grupo','Resumo de hoje'));
   const grade = el('div','resumo-grade');
 
-  // 1. meta anual (implícita: faturamento total do ano passado inteiro
-  // × (1+meta%) — não existe campo de "meta anual em R$" em lugar
-  // nenhum, então essa é a única meta anual que dá pra calcular sem
-  // inventar uma regra de negócio nova. É construída só com o que já
-  // existe: os 12 meses de A/P e o % de crescimento configurado.
+  // 1. meta anual/mensal (implícita: mesmo período do ano passado ×
+  // (1+meta%) — não existe campo de "meta em R$" cadastrado em lugar
+  // nenhum, então essa é a única meta que dá pra calcular sem inventar
+  // uma regra de negócio nova. Ano e mês usam exatamente a mesma
+  // sistemática, só trocando a unidade de tempo (mês↔dia, ano↔mês).
   const A = new Array(12).fill(0), P = new Array(12).fill(0);
   B.forEach(r => {
     const y = r.dt.getUTCFullYear(), i = r.dt.getUTCMonth();
@@ -1450,41 +1484,79 @@ function secResumo(B, ano, meta, jan, hoje){
   });
   const temAno = B.some(r => r.dt.getUTCFullYear() === ano);
   const ultimo = temAno ? Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth())) : 0;
-  const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-  const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-  const metaAcum = accP*(1+meta);                 // comparação de sempre: mesmo período do ano passado
-  const difMeta = metaAcum ? (accA/metaAcum - 1)*100 : 0;
 
-  const metaAnual = P.reduce((a,b)=>a+b,0) * (1+meta);   // meta anual implícita: ano passado inteiro + meta%
-  const temMetaAnual = temAno && metaAnual > 0;
-  const faltamAnual = metaAnual - accA;
-  const pctAnual = temMetaAnual ? accA/metaAnual*100 : 0;
-  const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
-  const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
-  let ritmoNecessario = null, acimaDoRitmo = null;
-  if(temMetaAnual){
-    if(faltamAnual <= 0) acimaDoRitmo = true;
-    else if(mesesRestantes > 0){ ritmoNecessario = faltamAnual/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
-    else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
+  let vista;
+  if(RESUMO_PERIODO === 'mes'){
+    const diaAtual = hoje.getUTCDate();
+    const diasNoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
+    const realizado = A[ultimo] || 0;
+    const metaPeriodo = (P[ultimo] || 0) * (1+meta);
+    const temMeta = temAno && metaPeriodo > 0;
+    const falta = metaPeriodo - realizado;
+    const pct = temMeta ? realizado/metaPeriodo*100 : 0;
+    const unidadesRestantes = diasNoMes - diaAtual;
+    const ritmoAtual = diaAtual ? realizado/diaAtual : 0;
+    let ritmoNecessario = null, acimaDoRitmo = null;
+    if(temMeta){
+      if(falta <= 0) acimaDoRitmo = true;
+      else if(unidadesRestantes > 0){ ritmoNecessario = falta/unidadesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
+      else acimaDoRitmo = false;   // último dia do mês, meta ainda não batida
+    }
+    const difAnoPassado = P[ultimo] ? (realizado/P[ultimo] - 1)*100 : 0;
+    vista = {
+      rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, unidade:'dia',
+      realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
+      semBase: `Sem faturamento em ${MES[ultimo]}/${ano-1} para calcular a meta do mês.`,
+      difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`
+    };
+  } else {
+    const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+    const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+    const metaPeriodo = P.reduce((a,b)=>a+b,0) * (1+meta);   // ano passado inteiro + meta%
+    const temMeta = temAno && metaPeriodo > 0;
+    const falta = metaPeriodo - accA;
+    const pct = temMeta ? accA/metaPeriodo*100 : 0;
+    const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
+    const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
+    let ritmoNecessario = null, acimaDoRitmo = null;
+    if(temMeta){
+      if(falta <= 0) acimaDoRitmo = true;
+      else if(mesesRestantes > 0){ ritmoNecessario = falta/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
+      else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
+    }
+    const metaAcum = accP*(1+meta);   // meta do mesmo período (não do ano todo) — é a comparação que já existia
+    const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
+    vista = {
+      rotulo: `Meta anual · ${ano}`, unidade:'mês',
+      realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
+      semBase: `Sem faturamento em ${ano-1} para calcular uma meta anual.`,
+      difComparativo: difMesmoPeriodo, comparativoTexto: `mesmo período de ${ano-1}`
+    };
   }
-  const statusMeta = !temMetaAnual ? 'atencao' : acimaDoRitmo ? 'alta' : 'baixa';
 
-  const linhaMeta = !temMetaAnual
-    ? `Sem faturamento em ${ano-1} para calcular uma meta anual.`
-    : faltamAnual > 0
-      ? `${pctAnual.toFixed(0)}% de <b>${brl(metaAnual)}</b> · faltam ${brl(faltamAnual)}`
-      : `${pctAnual.toFixed(0)}% de <b>${brl(metaAnual)}</b> · meta batida, ${brl(-faltamAnual)} acima`;
+  const statusMeta = !vista.temMeta ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
+  const linhaMeta = !vista.temMeta
+    ? vista.semBase
+    : vista.falta > 0
+      ? `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · faltam ${brl(vista.falta)}`
+      : `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · meta batida, ${brl(-vista.falta)} acima`;
 
-  const chip = acimaDoRitmo == null ? ''
-    : `<span class="ritmo-chip">${acimaDoRitmo ? 'acima do ritmo' : 'abaixo do ritmo'}</span>`;
-  const linhaRitmo = !temMetaAnual ? null
-    : ritmoNecessario != null
-      ? `${chip} ritmo atual ${brl(ritmoAtual)}/mês · necessário ${brl(ritmoNecessario)}/mês`
-      : `${chip} ritmo atual ${brl(ritmoAtual)}/mês`;
+  const chip = vista.acimaDoRitmo == null ? ''
+    : `<span class="ritmo-chip">${vista.acimaDoRitmo ? 'acima do ritmo' : 'abaixo do ritmo'}</span>`;
+  const linhaRitmo = !vista.temMeta ? null
+    : vista.ritmoNecessario != null
+      ? `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade} · necessário ${brl(vista.ritmoNecessario)}/${vista.unidade}`
+      : `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade}`;
+
+  const abasMeta = `<div class="meta-abas">
+    <button class="meta-aba ${RESUMO_PERIODO==='ano'?'on':''}" data-periodo-meta="ano">Ano</button>
+    <button class="meta-aba ${RESUMO_PERIODO==='mes'?'on':''}" data-periodo-meta="mes">Mês</button>
+  </div>`;
 
   grade.appendChild(blocoMeta(
-    statusMeta, `Meta anual · ${ano}`, brl(accA), pctAnual, linhaMeta, linhaRitmo,
-    `<span class="resumo-selo">${difMeta>=0?'+':'−'}${Math.abs(difMeta).toFixed(1).replace('.',',')}%</span> vs. mesmo período de ${ano-1}`
+    statusMeta, vista.rotulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
+    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
+    abasMeta
   ));
 
   // 2. clientes atrasados na cadência (mesmo cálculo de secCadencia,
@@ -1730,10 +1802,10 @@ function donutABC(lista, tot, rotulo){
   const card = el('div','painel painel-donut');
 
   const MAXFATIAS = 7;
-  const fatias = lista.slice(0, MAXFATIAS).map((c,i) => ({ nome:c.nome, share:c.share, cor:tintaAzul(i) }));
+  const fatias = lista.slice(0, MAXFATIAS).map((c,i) => ({ nome:c.nome, share:c.share, fat:c.fat, cor:tintaAzul(i) }));
   if(lista.length > MAXFATIAS){
     const resto = lista.slice(MAXFATIAS).reduce((a,c)=>a+c.fat,0);
-    fatias.push({ nome:'Outros', share: resto/tot*100, cor:'var(--grafite)' });
+    fatias.push({ nome:'Outros', share: resto/tot*100, fat: resto, cor:'var(--grafite)' });
   }
 
   // Percentual sem casa decimal em todo o gráfico. Arredondar pode
@@ -1772,7 +1844,7 @@ function donutABC(lista, tot, rotulo){
   svg += rotulos + '</svg>';
 
   const legenda = fatias.map(f =>
-    `<span><i style="background:${f.cor}"></i>${f.nome} · <b style="font-family:var(--mono);font-weight:600;color:var(--tinta)">${p0(f.share)}</b></span>`
+    `<span><i style="background:${f.cor}"></i>${f.nome} · <b style="font-family:var(--mono);font-weight:600;color:var(--tinta)">${abrevBRL(f.fat)}</b></span>`
   ).join('');
 
   card.innerHTML = svg
