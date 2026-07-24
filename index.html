@@ -393,6 +393,11 @@ th[data-sort][aria-sort="ascending"],
 th[data-sort][aria-sort="descending"]{color:var(--azul)}
 th[data-sort][aria-sort="ascending"] .seta,
 th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
+
+/* Linha da ABC é clicável: abre o desempenho mensal daquele cliente. */
+table.abc tbody tr[data-ck]{cursor:pointer}
+table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--azul-neon)}
+
 .classe{
   font-family:var(--mono);font-size:10.5px;font-weight:600;
   padding:2px 7px;border-radius:100px;
@@ -448,6 +453,24 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
   font-family:var(--cond);font-size:16px;letter-spacing:.06em;text-transform:uppercase;
   margin:0 0 8px;color:var(--tinta);
 }
+
+/* ---------- popup de desempenho do cliente ---------- */
+.modal-cliente{max-width:760px;position:relative;padding-top:44px}
+.fechar-x{
+  position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;
+  background:var(--papel);border:1px solid var(--linha);color:var(--grafite);
+  font-size:17px;line-height:1;display:grid;place-items:center;padding:0;
+  transition:background var(--rapido),color var(--rapido),transform var(--rapido);
+}
+.fechar-x:hover{background:var(--azul-claro);color:var(--azul)}
+.fechar-x:active{transform:scale(.92)}
+.cliente-sub{color:var(--grafite);font-size:12.5px;margin:0 0 18px}
+.cliente-sub b{color:var(--tinta);font-weight:600;font-family:var(--mono)}
+/* O gráfico pode precisar de mais largura do que o popup tem (muitos
+   meses); em vez de espremer, rola de lado — o mesmo raciocínio do
+   graf-rolo mobile, só que aqui vale em qualquer tamanho de tela. */
+.cliente-rolo{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -8px;padding:0 8px 4px}
+
 .zona{
   border:1px dashed #D8DFEE;border-radius:var(--r);padding:30px;text-align:center;
   color:var(--grafite);margin:20px 0;
@@ -756,6 +779,16 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
   </div>
 </div>
 
+<!-- ============ MODAL DE DESEMPENHO DO CLIENTE ============ -->
+<div class="fundo" id="fundoCliente">
+  <div class="modal modal-cliente">
+    <button class="fechar-x" id="btnFecharCliente" type="button" aria-label="Fechar">×</button>
+    <h3 id="clienteNome">Cliente</h3>
+    <p class="cliente-sub" id="clienteSub"></p>
+    <div id="clienteGraficoZona"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 /* ==========================================================
@@ -1059,6 +1092,100 @@ $('#main').addEventListener('keydown', e => {
   if(!th) return;
   e.preventDefault();
   alternarOrdenacao(th);
+});
+
+/* ==========================================================
+   6.3c popup de desempenho mensal do cliente (clique na linha da ABC)
+   Sempre desde janeiro/2025 até o mês mais recente da base, ignorando
+   qualquer mês em foco — é uma foto do histórico inteiro daquele
+   cliente, igual "última compra"/"situação" já fazem na própria ABC.
+   ========================================================== */
+const ANO_INICIO_HISTORICO = 2025, MES_INICIO_HISTORICO = 0; // janeiro
+
+function serieMensalCliente(ck){
+  const B = base();
+  if(!B.length) return [];
+  const hoje = new Date(Math.max(...B.map(r => r.dt)));
+  const anoFim = hoje.getUTCFullYear(), mesFim = hoje.getUTCMonth();
+
+  const somaPorMes = {};
+  B.forEach(r => { if(r.ck !== ck) return;
+    const k = r.dt.getUTCFullYear() + '-' + r.dt.getUTCMonth();
+    somaPorMes[k] = (somaPorMes[k] || 0) + r.valor;
+  });
+
+  const serie = [];
+  let ano = ANO_INICIO_HISTORICO, mes = MES_INICIO_HISTORICO;
+  while(ano < anoFim || (ano === anoFim && mes <= mesFim)){
+    serie.push({ ano, mes, valor: somaPorMes[ano+'-'+mes] || 0 });
+    mes++; if(mes > 11){ mes = 0; ano++; }
+  }
+  return serie;
+}
+
+function linhaCliente(serie){
+  const largura = Math.max(560, serie.length * 46);
+  const H=260, e=54, d=16, t=20, b=36;
+  const max = Math.max(...serie.map(p => p.valor), 1) * 1.15;
+  const lg = (largura-e-d) / Math.max(serie.length-1, 1);
+  const y = v => t + (H-t-b) * (1 - v/max);
+  const x = i => e + i*lg;
+
+  let g = `<svg style="width:auto;min-width:${largura}px;display:block" viewBox="0 0 ${largura} ${H}" role="img" aria-label="Faturamento mensal do cliente desde janeiro de 2025">`;
+  for(let i=0;i<=4;i++){
+    const v = max*i/4, yy = y(v);
+    g += `<line x1="${e}" y1="${yy}" x2="${largura-d}" y2="${yy}" stroke="#EEF1F8"/>
+          <text x="${e-8}" y="${yy+4}" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#8C94B2">${Math.round(v/1000)}k</text>`;
+  }
+  const pontos = serie.map((p,i) => `${x(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ');
+  const area = `${x(0).toFixed(1)},${y(0).toFixed(1)} ${pontos} ${x(serie.length-1).toFixed(1)},${y(0).toFixed(1)}`;
+  g += `<polygon points="${area}" fill="var(--azul-claro)" opacity="0.55"/>`;
+  g += `<polyline points="${pontos}" fill="none" stroke="var(--azul)" stroke-width="2"/>`;
+  serie.forEach((p,i) => {
+    g += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.valor).toFixed(1)}" r="3.5" fill="var(--azul)" stroke="#fff" stroke-width="1.5">
+            <title>${MES[p.mes]}/${p.ano}: ${brl(p.valor)}</title>
+          </circle>
+          <text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="10" fill="#5C6689">${MES[p.mes]}/${String(p.ano).slice(2)}</text>`;
+  });
+  g += `<line x1="${e}" y1="${H-b}" x2="${largura-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
+  return g;
+}
+
+function abrirClienteModal(ck, nome){
+  const serie = serieMensalCliente(ck);
+  $('#clienteNome').textContent = nome;
+  const zona = $('#clienteGraficoZona');
+
+  if(!serie.length){
+    zona.innerHTML = `<div class="vazio" style="padding:28px 14px"><h3>Sem histórico suficiente</h3>
+      <p style="margin:0">Não há faturamento registrado para montar o gráfico deste cliente.</p></div>`;
+    $('#clienteSub').textContent = '';
+  } else {
+    const total = serie.reduce((a,p) => a+p.valor, 0);
+    const comCompra = serie.filter(p => p.valor > 0).length;
+    $('#clienteSub').innerHTML =
+      `Desde jan/2025 · <b>${brl(total)}</b> no período · ${comCompra} de ${serie.length} meses com compra`;
+    zona.innerHTML = `<div class="cliente-rolo">${linhaCliente(serie)}</div>`;
+  }
+  $('#fundoCliente').classList.add('on');
+}
+
+$('#main').addEventListener('click', e => {
+  const tr = e.target.closest('table.abc tbody tr[data-ck]');
+  if(tr) abrirClienteModal(tr.dataset.ck, tr.dataset.nome);
+});
+$('#main').addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const tr = e.target.closest('table.abc tbody tr[data-ck]');
+  if(!tr) return;
+  e.preventDefault();
+  abrirClienteModal(tr.dataset.ck, tr.dataset.nome);
+});
+
+$('#btnFecharCliente').onclick = () => $('#fundoCliente').classList.remove('on');
+$('#fundoCliente').onclick = e => { if(e.target === $('#fundoCliente')) $('#fundoCliente').classList.remove('on'); };
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') $('#fundoCliente').classList.remove('on');
 });
 
 function atualizarChipFiltro(){
@@ -1518,7 +1645,7 @@ function secABC(B, ano, hoje, jan, filtroMes){
     ${thOrd('NFs','nfs','abc',{alinhar:'d'})}
     ${thOrd('Última compra','ultima','abc')}${thOrd('Situação','situacao','abc')}</tr></thead><tbody>`;
   listaOrdenada.forEach(c => {
-    h += `<tr>
+    h += `<tr data-ck="${c.k}" data-nome="${c.nome}" tabindex="0" role="button" aria-label="Ver desempenho mensal de ${c.nome}">
       <td class="num" data-rot="Posição">${c.pos}</td>
       <td data-rot="Classe"><span class="classe c${c.classe}">${c.classe}</span></td>
       <td>${c.nome}</td>
