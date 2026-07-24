@@ -155,8 +155,11 @@ header .marca span{color:var(--menta)}
 .barra{
   position:sticky;top:54px;z-index:30;background:rgba(255,255,255,.92);
   backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);
-  border-bottom:1px solid var(--linha-fina);padding:10px 22px;
-  display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;
+  border-bottom:1px solid var(--linha-fina);
+}
+.barra-miolo{
+  max-width:1240px;margin:0 auto;padding:10px 22px;
+  display:flex;gap:20px;align-items:center;flex-wrap:wrap;
 }
 /* Legenda de campo (Ano-base, Meta, PETMED...) sem caixa alta e sem
    tracking — o rótulo de grupo acima já marca a seção; o campo em si
@@ -191,12 +194,14 @@ header .marca span{color:var(--menta)}
 .selo.velho i{background:var(--baixa)}
 
 .divisor-ctrl{width:1px;align-self:stretch;background:var(--linha-fina);margin:0 2px}
-.grupo-ctrl{display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap}
-/* Rótulo de grupo: continua maiúsculo (é convenção de seção em todo o
-   resto do arquivo), mas com menos tracking — marca a seção sem gritar. */
+.grupo-ctrl{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+/* Rótulo de grupo agora é uma etiqueta compacta em linha com os campos,
+   não mais uma legenda ocupando a largura inteira acima deles — é essa
+   troca (vertical → inline) que tira o ar de "duas fileiras vazias" da
+   barra e aproxima o rótulo do que ele está rotulando. */
 .rot-grupo{
   font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;
-  color:var(--tenue);margin-bottom:5px;width:100%;
+  color:var(--tenue);white-space:nowrap;flex:0 0 auto;
 }
 .estado-ativo .btn-h{box-shadow:var(--sombra)}
 
@@ -457,8 +462,8 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
 }
 .fim{display:flex;gap:9px;justify-content:flex-end;margin-top:22px}
 @media(max-width:640px){
-  .barra{
-    gap:10px;padding:10px 14px;flex-wrap:nowrap;align-items:center;position:sticky;top:54px;
+  .barra-miolo{
+    gap:10px;padding:10px 14px;flex-wrap:nowrap;align-items:center;max-width:none;
   }
   .divisor-ctrl{display:none}
   main{padding:16px 14px 96px}
@@ -505,7 +510,8 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
     animation:sobe .16s var(--curva) both;
   }
   .filtros-corpo.aberta{display:flex}
-  .filtros-corpo .grupo-ctrl{gap:14px 18px}
+  .filtros-corpo .grupo-ctrl{gap:14px 18px;align-items:flex-end}
+  .filtros-corpo .rot-grupo{width:100%;margin-bottom:5px;white-space:normal}
   .filtros-corpo .ref{width:100%;text-align:left;margin:2px 0 0;padding-top:14px;border-top:1px solid var(--linha-fina)}
 
   /* ---- toque: nada abaixo de ~44px, ninguém erra o alvo ---- */
@@ -669,6 +675,7 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
   </header>
 
   <div class="barra">
+   <div class="barra-miolo">
     <button class="btn-h so-mobile" id="btnToggleFiltros" type="button" aria-expanded="false">
       Filtros <span class="ponto-filtro" id="pontoFiltro" hidden></span>
     </button>
@@ -714,8 +721,11 @@ th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
         </div>
       </div>
 
+      <div class="divisor-ctrl"></div>
+
       <div class="ref" id="ref"></div>
     </div>
+   </div>
   </div>
 
   <main id="main"></main>
