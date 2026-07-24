@@ -232,6 +232,13 @@ header .marca span{color:var(--menta)}
   text-transform:uppercase;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:12px;
 }
 .resumo-label i{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
+/* Selo explícito da meta de crescimento fixa, nos dois cards de meta —
+   não é mais um campo editável na barra, então precisa aparecer aqui. */
+.meta-crescimento{
+  margin-left:auto;font-family:var(--mono);font-size:9px;font-weight:600;
+  text-transform:none;letter-spacing:.02em;color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.08);padding:2px 7px;border-radius:100px;white-space:nowrap;
+}
 .status-alta .resumo-label i{background:var(--menta)}
 .status-atencao .resumo-label i{background:#FFC16E}
 .status-baixa .resumo-label i{background:#FF9E93}
@@ -293,10 +300,16 @@ header .marca span{color:var(--menta)}
 }
 
 @media(max-width:780px){
-  .resumo-grade{grid-template-columns:1fr;gap:20px}
-  .resumo-bloco{padding:0 0 18px!important;border:none!important}
-  .resumo-bloco:not(:last-child){border-bottom:1px solid rgba(255,255,255,.12)!important}
-  .resumo-bloco:last-child{padding-bottom:0!important}
+  /* Cada terço vira seu próprio cartão dentro do card escuro — tinta de
+     fundo sutil + cantos arredondados + respiro real entre eles. Uma
+     linha fina não segurava a separação com o conteúdo mais denso que
+     os cards de meta ganharam (barra, ritmo, selo); um cartão dentro do
+     cartão segura melhor, principalmente rolando no celular. */
+  .resumo-grade{grid-template-columns:1fr;gap:12px}
+  .resumo-bloco{
+    padding:18px!important;border:none!important;
+    background:rgba(255,255,255,.045);border-radius:14px;
+  }
 }
 @media(max-width:640px){
   .resumo{padding:20px 20px 22px}
@@ -752,10 +765,6 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
           <select id="anoBase"></select>
         </div>
         <div class="ctrl">
-          <label for="meta">Meta de crescimento %</label>
-          <input id="meta" type="number" inputmode="numeric" value="10" min="-50" max="200" step="1">
-        </div>
-        <div class="ctrl">
           <label for="dias">Inativo após (dias)</label>
           <input id="dias" type="number" inputmode="numeric" value="120" min="30" max="720" step="15">
         </div>
@@ -845,9 +854,11 @@ const CONFIG = {
     { nome:'DOGNIFICO + COMP. BR + SJR', contem:['DOGNIFICO','COMPONENTES BR','SJR'] }
   ],
 
-  // DIAS_INATIVO e META_CRESCIMENTO não moram aqui: o usuário controla
-  // os dois em tempo real pelos campos #dias e #meta na barra superior
-  // (valores iniciais definidos direto no HTML, 120 e 10).
+  // DIAS_INATIVO ainda é ajustável em tempo real pelo campo #dias na
+  // barra superior (valor inicial 120, no HTML). META_CRESCIMENTO virou
+  // fixo por decisão de negócio — não tem mais campo editável; muda
+  // aqui, e só aqui, se um dia precisar mudar de novo.
+  META_CRESCIMENTO  : 0.25, // 25% de crescimento sobre o mesmo período do ano anterior
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
   ATRASO_MINIMO     : 21    // dias de atraso para entrar na worklist
 };
@@ -1050,7 +1061,7 @@ function montarAnos(){
   anos.forEach(a => s.add(new Option(a, a)));
 }
 
-['#anoBase','#meta','#dias'].forEach(id => $(id).addEventListener('input', render));
+['#anoBase','#dias'].forEach(id => $(id).addEventListener('input', render));
 $('#btnPetmed').onclick = function(){
   PETMED_ON = !PETMED_ON;
   this.textContent = PETMED_ON ? 'Incluída' : 'Excluída';
@@ -1367,7 +1378,7 @@ function render(){
 
   const B    = base();
   const ano  = +$('#anoBase').value;
-  const meta = +$('#meta').value / 100;
+  const meta = CONFIG.META_CRESCIMENTO;
   const jan  = +$('#dias').value;
   const hoje = new Date(Math.max(...B.map(r => r.dt)));   // referência = última NF da base
 
@@ -1427,6 +1438,8 @@ function kpi(rot, val, pe, delta){
 function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra){
   const b = el('div', 'resumo-bloco resumo-meta status-' + status);
   const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
+  const tagCrescimento = el('span','meta-crescimento', `+${Math.round(CONFIG.META_CRESCIMENTO*100)}% a.a.`);
+  lab.appendChild(tagCrescimento);
   const val = el('div','resumo-valor'); val.textContent = valor;
   const barra = el('div','meta-barra');
   const fill = el('div','meta-barra-fill');
