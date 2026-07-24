@@ -401,6 +401,15 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
    linha. O donut, que naturalmente é mais baixo, usa a sobra de altura
    pra centralizar o próprio conteúdo em vez de deixar vazio embaixo. */
 .painel-donut{display:flex;flex-direction:column;justify-content:center}
+/* Altura travada e IDÊNTICA nos dois lados — não "esticar até o maior"
+   (isso já foi tentado e falha: max-height de um lado sempre vence
+   sobre o stretch do grid), e sim uma altura fixa que os dois têm que
+   obedecer, cada um rolando por dentro se o próprio conteúdo passar
+   disso. 580px é calculado pra caber o donut inteiro (título + gráfico
+   + legenda de 8 itens, o caso comum) sem precisar rolar — rolar um
+   gráfico com legenda pequena ficaria estranho. A tabela, com mais
+   espaço, só passa a mostrar mais linhas antes de precisar rolar.*/
+.abcGrid .rolo, .abcGrid .painel-donut, .abcGrid .vazio{height:580px;overflow-y:auto}
 .aba{
   border:1px solid var(--linha);background:var(--carta);padding:6px 14px;
   border-radius:100px;font-size:12.5px;font-weight:500;color:var(--grafite);
@@ -1661,7 +1670,7 @@ function secABC(B, ano, hoje, jan, filtroMes){
     situacao: c => c.diasSemComprar
   });
 
-  const r = el('div','rolo'); r.style.maxHeight='460px'; r.style.overflowY='auto';
+  const r = el('div','rolo');
   let h = `<table data-empilhar class="abc"><thead><tr>
     ${thOrd('#','pos','abc',{tipo:'texto'})}${thOrd('Classe','classe','abc',{tipo:'texto'})}${thOrd('Cliente','cliente','abc',{tipo:'texto'})}
     ${thOrd('Faturamento','faturamento','abc',{alinhar:'d'})}
