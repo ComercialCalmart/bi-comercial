@@ -275,21 +275,22 @@ header .marca span{color:var(--menta)}
 .status-atencao .ritmo-chip{background:rgba(255,193,110,.2);color:#FFC16E}
 .status-baixa .ritmo-chip{background:rgba(255,158,147,.2);color:#FF9E93}
 
-/* Cabeçalho do bloco de meta: rótulo à esquerda, abas Ano/Mês à
-   direita. Só existe nesse bloco (os outros dois usam .resumo-label
-   sozinho), então a margem que empurra o valor pra baixo mora aqui,
-   não em .resumo-label — evita dobrar o espaço quando os dois convivem. */
-.meta-cabecalho{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.meta-cabecalho .resumo-label{margin-bottom:0}
-.meta-abas{display:flex;gap:4px;flex:0 0 auto}
-.meta-aba{
-  font-family:var(--cond);font-size:9.5px;font-weight:600;letter-spacing:.03em;
-  text-transform:uppercase;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);
-  border:none;padding:4px 11px;border-radius:100px;cursor:pointer;
-  transition:background .14s var(--curva),color .14s var(--curva);
+/* Bloco 3 do resumo: Cadência e Carteira compiladas lado a lado, cada
+   uma com seu próprio rótulo/status/contexto — mais compacto do que
+   dois blocos inteiros, já que nenhuma das duas tem meta pra perseguir,
+   só contagem. */
+.resumo-duplo{display:flex;gap:20px}
+.resumo-mini{flex:1;min-width:0}
+.resumo-mini + .resumo-mini{padding-left:20px;border-left:1px solid rgba(255,255,255,.14)}
+.resumo-mini .resumo-label{margin-bottom:10px}
+.resumo-valor-mini{
+  font-family:var(--mono);font-size:21px;font-weight:600;color:#fff;
+  letter-spacing:-.02em;line-height:1.05;margin-bottom:8px;
 }
-.meta-aba:hover{background:rgba(255,255,255,.14);color:rgba(255,255,255,.85)}
-.meta-aba.on{background:rgba(255,255,255,.18);color:#fff}
+.resumo-valor-mini .resumo-unid{
+  font-family:var(--sans);font-size:12px;font-weight:500;
+  color:rgba(255,255,255,.5);letter-spacing:0;margin-left:3px;
+}
 
 @media(max-width:780px){
   .resumo-grade{grid-template-columns:1fr;gap:20px}
@@ -300,8 +301,10 @@ header .marca span{color:var(--menta)}
 @media(max-width:640px){
   .resumo{padding:20px 20px 22px}
   .resumo-valor{font-size:25px}
-  .meta-abas{width:100%;margin-top:8px;gap:6px}
-  .meta-aba{flex:1;min-height:38px;display:flex;align-items:center;justify-content:center;font-size:11px}
+  /* No mobile cada bloco já ocupa a largura inteira da tela — lado a
+     lado ficaria espremido, então empilha, cada mini-stat na sua linha. */
+  .resumo-duplo{flex-direction:column;gap:16px}
+  .resumo-mini + .resumo-mini{padding-left:0;border-left:none;padding-top:16px;border-top:1px solid rgba(255,255,255,.12)}
 }
 
 /* ---------- dica de interação ---------- */
@@ -884,7 +887,6 @@ let PETMED_ON = true;
 let PODE_IMPORTAR = false;  // definido no login, a partir da tabela perfis
 let FILTRO_MES = null;      // {ano, mes} quando uma coluna do gráfico está selecionada
 let CORTE_CADENCIA = CONFIG.ATRASO_MINIMO; // aba de dias escolhida em Cadência, sobrevive a qualquer re-render
-let RESUMO_PERIODO = 'ano'; // aba do bloco de meta no Resumo: 'ano' ou 'mes', sobrevive a qualquer re-render
 
 // Estado de ordenação por clique de cabeçalho, um por tabela. col=null
 // significa "usa a ordem padrão de cada seção" (a que já fazia sentido
@@ -1068,15 +1070,6 @@ $('#main').addEventListener('click', e => {
   const mes = +alvo.dataset.mes, ano = +alvo.dataset.ano;
   FILTRO_MES = (FILTRO_MES && FILTRO_MES.mes === mes && FILTRO_MES.ano === ano)
     ? null : { mes, ano };
-  render();
-});
-
-// Abas Ano/Mês do bloco de meta no Resumo — mesmo padrão de estado
-// persistido dos outros filtros: muda a variável, refaz o render inteiro.
-$('#main').addEventListener('click', e => {
-  const btn = e.target.closest('[data-periodo-meta]');
-  if(!btn) return;
-  RESUMO_PERIODO = btn.dataset.periodoMeta;
   render();
 });
 
@@ -1426,37 +1419,40 @@ function kpi(rot, val, pe, delta){
   return k;
 }
 
-function blocoResumo(status, label, valor, unidade, contextoHtml){
-  const b = el('div', 'resumo-bloco status-' + status);
-  const lab = el('div','resumo-label');
-  lab.innerHTML = `<i></i>${label}`;
-  const val = el('div','resumo-valor');
-  val.innerHTML = unidade ? `${valor}<span class="resumo-unid"> ${unidade}</span>` : valor;
-  const ctx = el('div','resumo-contexto');
-  ctx.innerHTML = contextoHtml;
-  b.append(lab, val, ctx);
-  return b;
-}
-
-// Bloco 1 do resumo (meta anual): mesma anatomia do blocoResumo — rótulo,
-// número grande, contexto — só que com barra de progresso e uma linha de
-// ritmo a mais. Só existe pra esse bloco porque só ele tem meta contra
-// a qual progredir; os outros dois são contagens, não perseguição de alvo.
-function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra, abasHtml){
+// Bloco de meta (usado duas vezes: anual e mensal) — rótulo, número
+// grande e contexto, como qualquer bloco do resumo, só que com barra de
+// progresso e uma linha de ritmo a mais. Só existe nesses dois porque
+// só eles têm meta contra a qual progredir; o terceiro é contagem, não
+// perseguição de alvo.
+function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra){
   const b = el('div', 'resumo-bloco resumo-meta status-' + status);
-  const cab = el('div','meta-cabecalho');
   const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
-  cab.appendChild(lab);
-  if(abasHtml){ cab.insertAdjacentHTML('beforeend', abasHtml); }
   const val = el('div','resumo-valor'); val.textContent = valor;
   const barra = el('div','meta-barra');
   const fill = el('div','meta-barra-fill');
   fill.style.width = Math.min(Math.max(pct,0),100) + '%';
   barra.appendChild(fill);
   const linha = el('div','meta-linha'); linha.innerHTML = linhaMeta;
-  b.append(cab, val, barra, linha);
+  b.append(lab, val, barra, linha);
   if(linhaRitmo){ const rt = el('div','meta-ritmo'); rt.innerHTML = linhaRitmo; b.appendChild(rt); }
   if(contextoExtra){ const cx = el('div','resumo-contexto'); cx.style.marginTop='8px'; cx.innerHTML = contextoExtra; b.appendChild(cx); }
+  return b;
+}
+
+// Bloco 3 do resumo: duas mini-estatísticas compiladas lado a lado
+// (Cadência + Carteira) — nenhuma das duas tem meta, então não precisam
+// do tratamento rico do blocoMeta, só rótulo + número + contexto, só
+// que na metade do espaço cada uma.
+function blocoDuplo(mini1, mini2){
+  const b = el('div','resumo-bloco resumo-duplo');
+  [mini1, mini2].forEach(m => {
+    const col = el('div', 'resumo-mini status-' + m.status);
+    const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${m.label}`;
+    const val = el('div','resumo-valor-mini'); val.innerHTML = `${m.valor}<span class="resumo-unid"> ${m.unidade}</span>`;
+    const ctx = el('div','resumo-contexto'); ctx.textContent = m.contexto;
+    col.append(lab, val, ctx);
+    b.appendChild(col);
+  });
   return b;
 }
 
@@ -1465,28 +1461,12 @@ function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExt
 // "pulso" do negócio, a leitura de baixo não deveria mudar o resumo
 // de cima. Cada bloco é rótulo + número grande + contexto, não frase
 // corrida: o número precisa bater o olho antes da explicação.
-function secResumo(B, ano, meta, jan, hoje){
-  const div = el('div','resumo');
-  div.id = 'sec-resumo';
-  div.appendChild(el('span','rot-grupo','Resumo de hoje'));
-  const grade = el('div','resumo-grade');
 
-  // 1. meta anual/mensal (implícita: mesmo período do ano passado ×
-  // (1+meta%) — não existe campo de "meta em R$" cadastrado em lugar
-  // nenhum, então essa é a única meta que dá pra calcular sem inventar
-  // uma regra de negócio nova. Ano e mês usam exatamente a mesma
-  // sistemática, só trocando a unidade de tempo (mês↔dia, ano↔mês).
-  const A = new Array(12).fill(0), P = new Array(12).fill(0);
-  B.forEach(r => {
-    const y = r.dt.getUTCFullYear(), i = r.dt.getUTCMonth();
-    if(y === ano)   A[i] += r.valor;
-    if(y === ano-1) P[i] += r.valor;
-  });
-  const temAno = B.some(r => r.dt.getUTCFullYear() === ano);
-  const ultimo = temAno ? Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth())) : 0;
-
-  let vista;
-  if(RESUMO_PERIODO === 'mes'){
+// Monta a "vista" de uma meta (ano ou mês) — mesma sistemática pros
+// dois, só troca a unidade de tempo (ano↔mês, mês↔dia). Extraída como
+// função porque agora os dois blocos existem ao mesmo tempo, sempre.
+function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
+  if(periodo === 'mes'){
     const diaAtual = hoje.getUTCDate();
     const diasNoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
     const realizado = A[ultimo] || 0;
@@ -1503,66 +1483,82 @@ function secResumo(B, ano, meta, jan, hoje){
       else acimaDoRitmo = false;   // último dia do mês, meta ainda não batida
     }
     const difAnoPassado = P[ultimo] ? (realizado/P[ultimo] - 1)*100 : 0;
-    vista = {
+    return {
       rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, unidade:'dia',
       realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
       semBase: `Sem faturamento em ${MES[ultimo]}/${ano-1} para calcular a meta do mês.`,
       difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`
     };
-  } else {
-    const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-    const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-    const metaPeriodo = P.reduce((a,b)=>a+b,0) * (1+meta);   // ano passado inteiro + meta%
-    const temMeta = temAno && metaPeriodo > 0;
-    const falta = metaPeriodo - accA;
-    const pct = temMeta ? accA/metaPeriodo*100 : 0;
-    const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
-    const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
-    let ritmoNecessario = null, acimaDoRitmo = null;
-    if(temMeta){
-      if(falta <= 0) acimaDoRitmo = true;
-      else if(mesesRestantes > 0){ ritmoNecessario = falta/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
-      else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
-    }
-    const metaAcum = accP*(1+meta);   // meta do mesmo período (não do ano todo) — é a comparação que já existia
-    const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
-    vista = {
-      rotulo: `Meta anual · ${ano}`, unidade:'mês',
-      realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
-      semBase: `Sem faturamento em ${ano-1} para calcular uma meta anual.`,
-      difComparativo: difMesmoPeriodo, comparativoTexto: `mesmo período de ${ano-1}`
-    };
   }
+  const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+  const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
+  const metaPeriodo = P.reduce((a,b)=>a+b,0) * (1+meta);   // ano passado inteiro + meta%
+  const temMeta = temAno && metaPeriodo > 0;
+  const falta = metaPeriodo - accA;
+  const pct = temMeta ? accA/metaPeriodo*100 : 0;
+  const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
+  const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
+  let ritmoNecessario = null, acimaDoRitmo = null;
+  if(temMeta){
+    if(falta <= 0) acimaDoRitmo = true;
+    else if(mesesRestantes > 0){ ritmoNecessario = falta/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
+    else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
+  }
+  const metaAcum = accP*(1+meta);   // meta do mesmo período (não do ano todo) — é a comparação que já existia
+  const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
+  return {
+    rotulo: `Meta anual · ${ano}`, unidade:'mês',
+    realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
+    semBase: `Sem faturamento em ${ano-1} para calcular uma meta anual.`,
+    difComparativo: difMesmoPeriodo, comparativoTexto: `mesmo período de ${ano-1}`
+  };
+}
 
-  const statusMeta = !vista.temMeta ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
+// A partir de uma vista (ano ou mês), monta o bloco pronto pro grid.
+function blocoDaVista(vista){
+  const status = !vista.temMeta ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
   const linhaMeta = !vista.temMeta
     ? vista.semBase
     : vista.falta > 0
       ? `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · faltam ${brl(vista.falta)}`
       : `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · meta batida, ${brl(-vista.falta)} acima`;
-
   const chip = vista.acimaDoRitmo == null ? ''
     : `<span class="ritmo-chip">${vista.acimaDoRitmo ? 'acima do ritmo' : 'abaixo do ritmo'}</span>`;
   const linhaRitmo = !vista.temMeta ? null
     : vista.ritmoNecessario != null
       ? `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade} · necessário ${brl(vista.ritmoNecessario)}/${vista.unidade}`
       : `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade}`;
+  return blocoMeta(
+    status, vista.rotulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
+    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`
+  );
+}
 
-  const abasMeta = `<div class="meta-abas">
-    <button class="meta-aba ${RESUMO_PERIODO==='ano'?'on':''}" data-periodo-meta="ano">Ano</button>
-    <button class="meta-aba ${RESUMO_PERIODO==='mes'?'on':''}" data-periodo-meta="mes">Mês</button>
-  </div>`;
+function secResumo(B, ano, meta, jan, hoje){
+  const div = el('div','resumo');
+  div.id = 'sec-resumo';
+  div.appendChild(el('span','rot-grupo','Resumo de hoje'));
+  const grade = el('div','resumo-grade');
 
-  grade.appendChild(blocoMeta(
-    statusMeta, vista.rotulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
-    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
-    abasMeta
-  ));
+  // Base comum das duas metas (implícita: mesmo período do ano passado
+  // × (1+meta%) — não existe campo de "meta em R$" cadastrado em lugar
+  // nenhum, então essa é a única meta que dá pra calcular sem inventar
+  // uma regra de negócio nova).
+  const A = new Array(12).fill(0), P = new Array(12).fill(0);
+  B.forEach(r => {
+    const y = r.dt.getUTCFullYear(), i = r.dt.getUTCMonth();
+    if(y === ano)   A[i] += r.valor;
+    if(y === ano-1) P[i] += r.valor;
+  });
+  const temAno = B.some(r => r.dt.getUTCFullYear() === ano);
+  const ultimo = temAno ? Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth())) : 0;
 
-  // 2. clientes atrasados na cadência (mesmo cálculo de secCadencia,
-  // com o corte-padrão de CONFIG.ATRASO_MINIMO, sempre sobre o
-  // histórico inteiro). Âmbar, não vermelho: é lembrete de ligação,
-  // não uma perda, mesma leitura já usada no pill "atraso" da cadência.
+  // 1. meta anual — 2. meta do mês: os dois sempre visíveis, lado a lado.
+  grade.appendChild(blocoDaVista(vistaMeta('ano', A, P, ano, meta, temAno, ultimo, hoje)));
+  grade.appendChild(blocoDaVista(vistaMeta('mes', A, P, ano, meta, temAno, ultimo, hoje)));
+
+  // 3. Cadência (na hora de ligar) + Carteira (últimos 7 dias),
+  // compiladas num só bloco — nenhuma das duas tem meta, só contagem.
   const mCad = {};
   B.forEach(r => {
     if(ehDrop(r.cn)) return;
@@ -1579,24 +1575,25 @@ function secResumo(B, ano, meta, jan, hoje){
     const semComprar = diasEntre(ds[ds.length-1], hoje);
     if(semComprar - ritmo >= CONFIG.ATRASO_MINIMO){ atrasados++; r12Atrasados += c.r12; }
   });
-  grade.appendChild(blocoResumo(
-    atrasados > 0 ? 'atencao' : 'alta',
-    'Cadência · na hora de ligar',
-    String(atrasados), atrasados===1?'cliente':'clientes',
-    atrasados > 0 ? `${brl(r12Atrasados)} em receita de 12 meses` : 'Ninguém atrasado agora'
-  ));
 
-  // 3. clientes que cruzaram a linha de inatividade nos últimos 7 dias:
-  // esse sim é perda de verdade, por isso é o único vermelho dos três.
   const ultCompra = {};
   B.forEach(r => { if(!ultCompra[r.ck] || r.dt > ultCompra[r.ck]) ultCompra[r.ck] = r.dt; });
   const perdidosSemana = Object.values(ultCompra)
     .filter(d => { const dd = diasEntre(d, hoje); return dd > jan && dd <= jan+7; }).length;
-  grade.appendChild(blocoResumo(
-    perdidosSemana > 0 ? 'baixa' : 'alta',
-    'Carteira · últimos 7 dias',
-    String(perdidosSemana), perdidosSemana===1?'cliente':'clientes',
-    perdidosSemana > 0 ? `cruzaram a linha de ${jan} dias sem comprar` : 'Ninguém cruzou a linha de inatividade'
+
+  grade.appendChild(blocoDuplo(
+    {
+      status: atrasados > 0 ? 'atencao' : 'alta',
+      label: 'Cadência · na hora de ligar',
+      valor: String(atrasados), unidade: atrasados===1?'cliente':'clientes',
+      contexto: atrasados > 0 ? `${brl(r12Atrasados)} em receita de 12 meses` : 'Ninguém atrasado agora'
+    },
+    {
+      status: perdidosSemana > 0 ? 'baixa' : 'alta',
+      label: 'Carteira · últimos 7 dias',
+      valor: String(perdidosSemana), unidade: perdidosSemana===1?'cliente':'clientes',
+      contexto: perdidosSemana > 0 ? `cruzaram a linha de ${jan} dias sem comprar` : 'Ninguém cruzou a linha de inatividade'
+    }
   ));
 
   div.appendChild(grade);
