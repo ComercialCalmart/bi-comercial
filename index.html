@@ -1593,6 +1593,16 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     if(P[i]>0) g += `<rect x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
     if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
     if(M[i]>0) g += `<line x1="${x+lg*0.46}" y1="${y(M[i])}" x2="${x+lg*0.86}" y2="${y(M[i])}" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    // Valor abreviado acima da barra que tem dado de verdade: o ano
+    // corrente (${ano}) quando já tem venda naquele mês; se ainda não
+    // chegou lá (mês futuro, A[i]=0), mostra o do ano anterior — nunca
+    // deixa o mês sem nenhum número em cima só porque o ano ainda não chegou.
+    const usaAtual = A[i] > 0;
+    const valorRotulo = usaAtual ? A[i] : P[i];
+    if(valorRotulo > 0){
+      const xRot = usaAtual ? x+lg*0.65 : x+lg*0.31;
+      g += `<text x="${xRot.toFixed(1)}" y="${(y(valorRotulo)-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" font-weight="600" fill="${usaAtual?'var(--azul)':'#8C94B2'}">${abrevBRL(valorRotulo)}</text>`;
+    }
     g += `<text x="${x+lg/2}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
   }
   g += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
