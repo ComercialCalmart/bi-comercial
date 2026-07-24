@@ -192,6 +192,11 @@ header .marca span{color:var(--menta)}
 }
 .estado-ativo .btn-h{box-shadow:var(--sombra)}
 
+/* ---------- elementos exclusivos do mobile: invisíveis e fora do
+   fluxo em qualquer tela maior, sem tocar em nenhuma regra acima ---------- */
+.so-mobile,.nav-secoes,.fab-importar{display:none}
+.filtros-corpo{display:contents}
+
 /* ---------- resumo (estado da união) ---------- */
 .resumo{
   background:linear-gradient(155deg, var(--azul-forte) 0%, #001033 100%);
@@ -369,6 +374,12 @@ tbody tr:hover{background:var(--véu)}
   background:var(--carta);border:1px dashed #D8DFEE;border-radius:var(--r);
   padding:56px 24px;text-align:center;
 }
+.esqueleto .barra-sk{
+  height:14px;border-radius:5px;margin-bottom:10px;
+  background:linear-gradient(90deg,var(--linha-fina) 25%,var(--linha) 50%,var(--linha-fina) 75%);
+  background-size:200% 100%;animation:pulsa 1.3s ease-in-out infinite;
+}
+@keyframes pulsa{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .vazio h3{
   font-family:var(--cond);font-size:15px;letter-spacing:.07em;text-transform:uppercase;
   margin:0 0 10px;color:var(--tinta);
@@ -404,15 +415,175 @@ tbody tr:hover{background:var(--véu)}
 }
 .fim{display:flex;gap:9px;justify-content:flex-end;margin-top:22px}
 @media(max-width:640px){
-  .barra{gap:16px;padding:12px 14px}
+  .barra{
+    gap:10px;padding:10px 14px;flex-wrap:nowrap;align-items:center;position:sticky;top:54px;
+  }
   .divisor-ctrl{display:none}
-  main{padding:22px 14px 72px}
+  main{padding:16px 14px 96px}
   .kpi .val{font-size:22px}
   .kpi{padding:14px 15px}
   .painel{padding:15px}
   header{padding:0 14px;gap:12px}
   .quem{display:none}
-  section{margin-bottom:32px}
+  section,#sec-resumo{margin-bottom:32px;scroll-margin-top:112px}
+
+  /* ---- a barra vira uma única linha compacta: botão de filtros +
+     navegação por seção. Os controles detalhados (ano, meta, dias,
+     PETMED, status de atualização) saem do fluxo e viram um painel
+     suspenso, aberto só sob demanda — a régua de sempre, sem sumir
+     com nenhuma funcionalidade, só sem ocupar tela por padrão. ---- */
+  .so-mobile{
+    display:flex;align-items:center;gap:6px;flex:0 0 auto;position:relative;
+    font-size:12.5px;padding:8px 12px;min-height:38px;
+  }
+  .ponto-filtro{
+    width:7px;height:7px;border-radius:50%;background:var(--menta);
+    box-shadow:0 0 0 2px rgba(255,255,255,.5);
+  }
+  .nav-secoes{
+    display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;flex:1 1 auto;min-width:0;
+    mask-image:linear-gradient(90deg,transparent,#000 12px,#000 92%,transparent);
+  }
+  .nav-secoes::-webkit-scrollbar{display:none}
+  .pilula{
+    scroll-snap-align:start;flex:0 0 auto;font-size:12px;font-weight:500;
+    padding:7px 13px;border-radius:100px;border:1px solid var(--linha);
+    background:var(--carta);color:var(--grafite);white-space:nowrap;
+    transition:background .14s var(--curva),color .14s var(--curva),border-color .14s var(--curva);
+  }
+  .pilula:active{transform:scale(.95)}
+  .pilula.on{background:var(--azul);color:#fff;border-color:var(--azul);font-weight:600}
+
+  .filtros-corpo{
+    display:none;position:absolute;top:calc(100% + 6px);left:14px;right:14px;
+    background:var(--carta);border:1px solid var(--linha);border-radius:var(--r-g);
+    box-shadow:var(--sombra-g);padding:18px 18px 16px;z-index:35;
+    flex-direction:column;gap:16px;
+    animation:sobe .16s var(--curva) both;
+  }
+  .filtros-corpo.aberta{display:flex}
+  .filtros-corpo .grupo-ctrl{gap:14px 18px}
+  .filtros-corpo .ref{width:100%;text-align:left;margin:2px 0 0;padding-top:14px;border-top:1px solid var(--linha-fina)}
+
+  /* ---- toque: nada abaixo de ~44px, ninguém erra o alvo ---- */
+  button,.btn,.btn-h,.aba,.ajuda,.classe,select,input{touch-action:manipulation}
+  .btn-h{min-height:40px;padding:8px 14px}
+  .aba{min-height:40px;padding:9px 16px;display:inline-flex;align-items:center}
+  .ajuda{width:26px;height:26px;font-size:12px}
+  #btnOlho{width:40px;height:40px}
+  .ctrl input,.ctrl select{min-height:40px;padding:9px 11px}
+  .ctrl input{width:64px}
+  .btn,.btn-full{min-height:46px}
+  .lembrar{min-height:44px;align-items:center}
+  .lembrar input{width:19px;height:19px}
+  .grade{gap:12px}
+
+  /* respiro entre os dois grupos dentro do painel suspenso */
+  .filtros-corpo .grupo-ctrl + .grupo-ctrl{padding-top:14px;border-top:1px solid var(--linha-fina)}
+
+  /* ---- iOS entende "16px+" como sinal de que não precisa dar zoom ---- */
+  .campo,.ctrl input,.ctrl select{font-size:16px}
+
+  /* ---- feedback de toque imediato, antes de qualquer resposta do banco ---- */
+  .btn:active,.btn-h:active,.aba:active{transform:scale(.96);transition:transform .1s var(--curva)}
+  .kpi:active{transform:scale(.98)}
+  tbody tr:active{background:var(--azul-claro)}
+
+  /* ---- tabelas largas: rolagem horizontal com aviso visual de que continua ---- */
+  .rolo{
+    -webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;
+    background:
+      linear-gradient(90deg,var(--carta) 0%,transparent 3%) ,
+      linear-gradient(270deg,var(--carta) 0%,transparent 3%) ,
+      radial-gradient(farthest-side at 0 50%, rgba(0,3,74,.08), transparent) ,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,3,74,.08), transparent) 100% 0;
+    background-repeat:no-repeat;
+    background-size:24px 100%,24px 100%,10px 100%,10px 100%;
+    background-attachment:local,local,scroll,scroll;
+  }
+  th,td{padding:10px 12px}
+
+  /* ---- perdidos e cadência: lista de cards em vez de tabela apertada ----
+     Ativa só quando o JS marca a tabela com data-empilhar (telas <640px
+     é exatamente onde a rolagem lateral por dentro de um card cansa
+     mais que rolar a página inteira). A tabela em si nunca muda; é
+     só a apresentação que troca de linha para cartão. */
+  .rolo table[data-empilhar] thead{display:none}
+  .rolo table[data-empilhar],
+  .rolo table[data-empilhar] tbody,
+  .rolo table[data-empilhar] tr{display:block;width:100%}
+  .rolo table[data-empilhar]{background:none}
+  .rolo table[data-empilhar] tr{
+    padding:14px 15px;margin:10px;border:1px solid var(--linha);border-radius:var(--r);
+    box-shadow:var(--sombra);background:var(--carta);
+  }
+  .rolo table[data-empilhar] tr:active{background:var(--véu)}
+  .rolo table[data-empilhar] td{
+    display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+    white-space:normal;border:none;padding:5px 0;font-size:13px;
+  }
+  .rolo table[data-empilhar] td::before{
+    content:attr(data-rot);color:var(--grafite);font-size:10.5px;letter-spacing:.06em;
+    text-transform:uppercase;font-weight:500;flex:0 0 auto;
+  }
+  .rolo table[data-empilhar] td:first-child{
+    font-weight:600;font-size:14.5px;color:var(--tinta);padding-bottom:8px;
+    margin-bottom:6px;border-bottom:1px solid var(--linha-fina);
+  }
+  .rolo table[data-empilhar] td:first-child::before{content:none}
+  .rolo table[data-empilhar] tr:has(td[colspan]){padding:0;border:none;box-shadow:none;background:none}
+  .rolo table[data-empilhar] tr:has(td[colspan]) td{display:block;text-align:center}
+
+  /* ---- ABC tem posição + classe + nome antes das métricas: quem
+     lidera o cartão aqui é o nome (3ª coluna), não a posição. Nada
+     de coluna escondida, só a mesma informação com a hierarquia
+     certa: posição e classe viram uma linha compacta acima do nome. ---- */
+  .rolo table[data-empilhar].abc td:first-child{
+    font-weight:500;font-size:11px;color:var(--tenue);letter-spacing:.04em;
+    padding-bottom:2px;margin-bottom:0;border-bottom:none;
+  }
+  .rolo table[data-empilhar].abc td:first-child::before{content:attr(data-rot)}
+  .rolo table[data-empilhar].abc td:nth-child(2){padding-bottom:6px}
+  .rolo table[data-empilhar].abc td:nth-child(3){
+    font-weight:600;font-size:14.5px;color:var(--tinta);
+    padding:2px 0 9px;margin-bottom:6px;border-bottom:1px solid var(--linha-fina);
+    display:block;
+  }
+
+  /* ---- modal de importação vira bottom sheet: mais fácil de alcançar com o polegar ---- */
+  .fundo{align-items:flex-end;padding:0}
+  .fundo.on{display:flex}
+  .modal{
+    max-width:none;width:100%;border-radius:18px 18px 0 0;
+    padding:22px 20px calc(20px + env(safe-area-inset-bottom));
+    animation:sobeFolha .22s var(--curva) both;
+  }
+  @keyframes sobeFolha{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .zona{padding:24px 16px}
+  .fim{flex-direction:column-reverse;gap:10px}
+  .fim .btn{width:100%;min-height:48px}
+
+  /* ---- FAB de importar: no bolso do polegar, não escondido no header ---- */
+  .fab-importar{
+    display:flex;align-items:center;justify-content:center;
+    position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));
+    width:52px;height:52px;border-radius:50%;z-index:45;
+    background:var(--azul);color:#fff;border:none;box-shadow:var(--sombra-g);
+    transition:transform .14s var(--curva),box-shadow .14s var(--curva);
+  }
+  .fab-importar:active{transform:scale(.92);box-shadow:var(--sombra-m)}
+
+  /* ---- gráficos de 12 colunas: no desktop cabem espremidos, no dedo
+     precisam de largura de verdade. Em vez de espremer, rola de lado
+     com respiro por coluna, igual às tabelas viram cartão acima. ---- */
+  .graf-rolo{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;margin:0 -15px;padding:0 15px}
+  .graf-rolo svg{width:auto;min-width:620px;height:auto}
+  .graf-rolo svg rect[data-mes]{scroll-snap-align:start}
+
+  /* ---- estado de carregamento: no mobile, um pouco mais compacto ---- */
+  .esqueleto{padding:4px 2px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -455,41 +626,62 @@ tbody tr:hover{background:var(--véu)}
   </header>
 
   <div class="barra">
-    <div class="grupo-ctrl">
-      <span class="rot-grupo">Configurações</span>
-      <div class="ctrl">
-        <label for="anoBase">Ano-base</label>
-        <select id="anoBase"></select>
+    <button class="btn-h so-mobile" id="btnToggleFiltros" type="button" aria-expanded="false">
+      Filtros <span class="ponto-filtro" id="pontoFiltro" hidden></span>
+    </button>
+
+    <nav class="nav-secoes" id="navSecoes" aria-label="Ir para seção">
+      <button class="pilula" data-alvo="sec-resumo">Resumo</button>
+      <button class="pilula" data-alvo="sec-faturamento">Faturamento</button>
+      <button class="pilula" data-alvo="sec-carteira">Carteira</button>
+      <button class="pilula" data-alvo="sec-abc">ABC</button>
+      <button class="pilula" data-alvo="sec-compradores">Compradores</button>
+      <button class="pilula" data-alvo="sec-perdidos">Perdidos</button>
+      <button class="pilula" data-alvo="sec-cadencia">Cadência</button>
+    </nav>
+
+    <div class="filtros-corpo" id="filtrosCorpo">
+      <div class="grupo-ctrl">
+        <span class="rot-grupo">Configurações</span>
+        <div class="ctrl">
+          <label for="anoBase">Ano-base</label>
+          <select id="anoBase"></select>
+        </div>
+        <div class="ctrl">
+          <label for="meta">Meta de crescimento %</label>
+          <input id="meta" type="number" inputmode="numeric" value="10" min="-50" max="200" step="1">
+        </div>
+        <div class="ctrl">
+          <label for="dias">Inativo após (dias)</label>
+          <input id="dias" type="number" inputmode="numeric" value="120" min="30" max="720" step="15">
+        </div>
       </div>
-      <div class="ctrl">
-        <label for="meta">Meta de crescimento %</label>
-        <input id="meta" type="number" value="10" min="-50" max="200" step="1">
+
+      <div class="divisor-ctrl"></div>
+
+      <div class="grupo-ctrl estado-ativo">
+        <span class="rot-grupo">O que está sendo visto agora</span>
+        <div class="ctrl">
+          <label>Cliente PETMED</label>
+          <button class="btn-h" id="btnPetmed" style="background:var(--azul);border-color:var(--azul);color:#fff">Incluída</button>
+        </div>
+        <div class="ctrl" id="filtroCtrl" style="display:none">
+          <label>Mês em foco</label>
+          <button class="btn-h on" id="btnLimparFiltro" style="background:var(--azul);border-color:var(--azul)"></button>
+        </div>
       </div>
-      <div class="ctrl">
-        <label for="dias">Inativo após (dias)</label>
-        <input id="dias" type="number" value="120" min="30" max="720" step="15">
-      </div>
+
+      <div class="ref" id="ref"></div>
     </div>
-
-    <div class="divisor-ctrl"></div>
-
-    <div class="grupo-ctrl estado-ativo">
-      <span class="rot-grupo">O que está sendo visto agora</span>
-      <div class="ctrl">
-        <label>Cliente PETMED</label>
-        <button class="btn-h" id="btnPetmed" style="background:var(--azul);border-color:var(--azul);color:#fff">Incluída</button>
-      </div>
-      <div class="ctrl" id="filtroCtrl" style="display:none">
-        <label>Mês em foco</label>
-        <button class="btn-h on" id="btnLimparFiltro" style="background:var(--azul);border-color:var(--azul)"></button>
-      </div>
-    </div>
-
-    <div class="ref" id="ref"></div>
   </div>
 
   <main id="main"></main>
 </div>
+
+<!-- ============ FAB IMPORTAR (mobile) ============ -->
+<button class="fab-importar" id="fabImportar" style="display:none" aria-label="Importar CSV">
+  <svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></svg>
+</button>
 
 <!-- ============ MODAL DE IMPORTAÇÃO ============ -->
 <div class="fundo" id="fundo">
@@ -634,6 +826,7 @@ async function abrir(){
       .select('pode_importar').eq('usuario_id', user.id).maybeSingle();
     PODE_IMPORTAR = perfil?.pode_importar === true;
     $('#btnImportar').style.display = PODE_IMPORTAR ? '' : 'none';
+    $('#fabImportar').style.display = PODE_IMPORTAR ? '' : 'none';
     await carregar();
   }catch(err){
     $('#main').innerHTML = `<div class="vazio"><h3>Não deu para carregar</h3>
@@ -647,7 +840,17 @@ async function abrir(){
    pagina até acabar.
    ========================================================== */
 async function carregar(){
-  $('#main').innerHTML = '<div class="vazio"><h3>Carregando</h3><p>Buscando o faturamento no banco.</p></div>';
+  $('#main').innerHTML = `<div class="esqueleto">
+    <div class="resumo" style="background:var(--carta);box-shadow:none;border:1px solid var(--linha)">
+      <div class="barra-sk" style="width:40%;height:11px"></div>
+      <div class="barra-sk" style="width:70%;height:26px;margin-top:12px"></div>
+    </div>
+    <div class="grade" style="margin-top:18px">
+      <div class="kpi"><div class="barra-sk" style="width:60%"></div><div class="barra-sk" style="width:80%;height:22px"></div></div>
+      <div class="kpi"><div class="barra-sk" style="width:50%"></div><div class="barra-sk" style="width:70%;height:22px"></div></div>
+      <div class="kpi"><div class="barra-sk" style="width:65%"></div><div class="barra-sk" style="width:75%;height:22px"></div></div>
+    </div>
+  </div>`;
   try{
     const linhas = []; const passo = 1000;
     for(let de = 0; ; de += passo){
@@ -751,7 +954,67 @@ function atualizarChipFiltro(){
   } else {
     c.style.display = 'none';
   }
+  // Bolinha no botão "Filtros" (só existe no mobile): avisa que há
+  // um recorte ativo mesmo com o painel fechado, sem obrigar a abrir
+  // para descobrir.
+  const ponto = $('#pontoFiltro');
+  if(ponto) ponto.hidden = !(FILTRO_MES || !PETMED_ON);
 }
+
+/* ---------- painel de filtros suspenso (mobile) ---------- */
+const btnToggleFiltros = $('#btnToggleFiltros');
+const filtrosCorpo = $('#filtrosCorpo');
+if(btnToggleFiltros){
+  btnToggleFiltros.onclick = () => {
+    const aberto = filtrosCorpo.classList.toggle('aberta');
+    btnToggleFiltros.setAttribute('aria-expanded', String(aberto));
+  };
+  // Fora do painel, ou trocou de seção: fecha. Dentro dele, deixa
+  // usar os controles sem fechar a cada clique.
+  document.addEventListener('click', e => {
+    if(!filtrosCorpo.classList.contains('aberta')) return;
+    if(filtrosCorpo.contains(e.target) || btnToggleFiltros.contains(e.target)) return;
+    filtrosCorpo.classList.remove('aberta');
+    btnToggleFiltros.setAttribute('aria-expanded', 'false');
+  });
+}
+
+/* ---------- navegação rápida por seção (mobile) ----------
+   Rola até a seção e marca a pílula correspondente conforme o que
+   está realmente visível, não conforme o que foi clicado por último
+   — assim continua certa mesmo se o usuário rolar com o dedo. */
+const navSecoes = $('#navSecoes');
+let observadorSecoes = null;
+if(navSecoes){
+  navSecoes.addEventListener('click', e => {
+    const b = e.target.closest('.pilula');
+    if(!b) return;
+    document.getElementById(b.dataset.alvo)?.scrollIntoView?.({ behavior:'smooth', block:'start' });
+  });
+}
+function iniciarNavSecoes(){
+  if(!navSecoes || typeof IntersectionObserver === 'undefined') return;
+  observadorSecoes?.disconnect();
+  const alvos = [...navSecoes.querySelectorAll('.pilula')]
+    .map(b => document.getElementById(b.dataset.alvo))
+    .filter(Boolean);
+  if(!alvos.length) return;
+  observadorSecoes = new IntersectionObserver(entradas => {
+    entradas.forEach(en => {
+      if(!en.isIntersecting) return;
+      const alvo = en.target.id;
+      navSecoes.querySelectorAll('.pilula').forEach(b =>
+        b.classList.toggle('on', b.dataset.alvo === alvo));
+      const on = navSecoes.querySelector('.pilula.on');
+      on?.scrollIntoView?.({ behavior:'smooth', inline:'center', block:'nearest' });
+    });
+  }, { rootMargin:'-112px 0px -70% 0px', threshold:0 });
+  alvos.forEach(a => observadorSecoes.observe(a));
+}
+
+/* ---------- FAB de importar (mobile): mesmo modal do botão do header ---------- */
+$('#fabImportar').onclick = () => { fundo.classList.add('on'); };
+
 
 // Compara a última NF da base com a data real de hoje (relógio do
 // navegador), não com "hoje" do dashboard, que é sempre a última NF.
@@ -807,6 +1070,7 @@ function render(){
   m.appendChild(secCompradores(B, ano, FILTRO_MES));
   m.appendChild(secPerdidos(B, hoje, jan, FILTRO_MES));
   m.appendChild(secCadencia(B, hoje, FILTRO_MES));
+  iniciarNavSecoes();
 }
 
 function cabecalho(pai, titulo, tag, nota, dica){
@@ -871,6 +1135,7 @@ function blocoResumo(status, label, valor, unidade, contextoHtml){
 // corrida: o número precisa bater o olho antes da explicação.
 function secResumo(B, ano, meta, jan, hoje){
   const div = el('div','resumo');
+  div.id = 'sec-resumo';
   div.appendChild(el('span','rot-grupo','Resumo de hoje'));
   const grade = el('div','resumo-grade');
 
@@ -939,7 +1204,7 @@ function secResumo(B, ano, meta, jan, hoje){
 
 /* ---------- 6.1 faturamento mensal ---------- */
 function secFaturamento(B, ano, meta, filtroMes){
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-faturamento';
   const noMes = !!(filtroMes && filtroMes.ano === ano);
   cabecalho(s, noMes ? `Faturamento · ${MES[filtroMes.mes]}/${ano}` : 'Faturamento mensal', 'direção', null, 'clique num mês para focar');
 
@@ -972,7 +1237,7 @@ function secFaturamento(B, ano, meta, filtroMes){
   s.appendChild(g);
 
   const p = el('div','painel'); p.style.marginTop = '12px';
-  p.innerHTML = barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano, filtroMes);
+  p.innerHTML = `<div class="graf-rolo">${barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano, filtroMes)}</div>`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
@@ -1008,7 +1273,7 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
 /* ---------- 6.2 carteira ---------- */
 function secCarteira(B, ano, hoje, jan, filtroMes){
   const { H, ref } = corteHistorico(B, hoje, filtroMes);
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-carteira';
   cabecalho(s, 'Carteira de clientes', null, filtroMes ? `como estava em ${dbr(ref)}` : null);
 
   const ult = {}, pri = {};
@@ -1036,7 +1301,7 @@ function secCarteira(B, ano, hoje, jan, filtroMes){
 
 /* ---------- 6.3 curva ABC ---------- */
 function secABC(B, ano, hoje, jan, filtroMes){
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-abc';
   const noMes = !!(filtroMes && filtroMes.ano === ano);
   const titulo = noMes ? `Maiores clientes · curva ABC · ${MES[filtroMes.mes]}/${ano}` : `Maiores clientes · curva ABC ${ano}`;
   cabecalho(s, titulo, 'pareto');
@@ -1064,22 +1329,22 @@ function secABC(B, ano, hoje, jan, filtroMes){
   s.appendChild(g);
 
   const r = el('div','rolo'); r.style.maxHeight='460px'; r.style.overflowY='auto';
-  let h = `<table><thead><tr>
+  let h = `<table data-empilhar class="abc"><thead><tr>
     <th>#</th><th>Classe</th><th>Cliente</th><th class="d">Faturamento</th>
     <th class="d">% total</th><th class="d">% acum.</th><th class="d">NFs</th>
     <th>Última compra</th><th>Situação</th></tr></thead><tbody>`;
   lista.forEach((c,i) => {
     const dd = diasEntre(ultGeral[c.k], hoje);
     h += `<tr>
-      <td class="num">${i+1}</td>
-      <td><span class="classe c${c.classe}">${c.classe}</span></td>
+      <td class="num" data-rot="Posição">${i+1}</td>
+      <td data-rot="Classe"><span class="classe c${c.classe}">${c.classe}</span></td>
       <td>${c.nome}</td>
-      <td class="d num">${brl(c.fat)}</td>
-      <td class="d num">${c.share.toFixed(1).replace('.',',')}%</td>
-      <td class="d num">${c.acc.toFixed(1).replace('.',',')}%</td>
-      <td class="d num">${c.nfs.size}</td>
-      <td class="num">${dbr(ultGeral[c.k])}</td>
-      <td><span class="pill ${dd<=jan?'ok':'no'}">${dd<=jan?'ativo':dd+' dias'}</span></td>
+      <td class="d num" data-rot="Faturamento">${brl(c.fat)}</td>
+      <td class="d num" data-rot="% do total">${c.share.toFixed(1).replace('.',',')}%</td>
+      <td class="d num" data-rot="% acumulado">${c.acc.toFixed(1).replace('.',',')}%</td>
+      <td class="d num" data-rot="NFs">${c.nfs.size}</td>
+      <td class="num" data-rot="Última compra">${dbr(ultGeral[c.k])}</td>
+      <td data-rot="Situação"><span class="pill ${dd<=jan?'ok':'no'}">${dd<=jan?'ativo':dd+' dias'}</span></td>
     </tr>`;
   });
   r.innerHTML = h + '</tbody></table>';
@@ -1175,7 +1440,7 @@ function donutABC(lista, tot, rotulo){
 
 /* ---------- 6.4 clientes compradores por mês ---------- */
 function secCompradores(B, ano, filtroMes){
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-compradores';
   const noMes = !!(filtroMes && filtroMes.ano === ano);
   cabecalho(s, 'Clientes compradores', 'unidades', noMes ? `${MES[filtroMes.mes]}/${ano} em foco` : null, 'clique num mês para focar');
 
@@ -1218,7 +1483,7 @@ function secCompradores(B, ano, filtroMes){
     sv += `<text x="${x+lg/2}" y="${H-10}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
   }
   sv += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
-  pn.innerHTML = sv;
+  pn.innerHTML = `<div class="graf-rolo">${sv}</div>`;
   s.appendChild(pn);
   s.insertAdjacentHTML('beforeend',
     `<p class="nota">Cada barra conta clientes únicos <b>naquele mês</b>. Quem compra em três meses
@@ -1230,7 +1495,7 @@ function secCompradores(B, ano, filtroMes){
 /* ---------- 6.5 perdidos ---------- */
 function secPerdidos(B, hoje, jan, filtroMes){
   const { H, ref } = corteHistorico(B, hoje, filtroMes);
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-perdidos';
   cabecalho(s, 'Clientes perdidos', 'comercial', filtroMes ? `como estava em ${dbr(ref)}` : null);
 
   const m = {};
@@ -1251,12 +1516,12 @@ function secPerdidos(B, hoje, jan, filtroMes){
   s.appendChild(g);
 
   const r = el('div','rolo'); r.style.marginTop='12px'; r.style.maxHeight='400px'; r.style.overflowY='auto';
-  let h = `<table><thead><tr><th>Cliente</th><th class="d">Faturamento histórico</th>
+  let h = `<table data-empilhar><thead><tr><th>Cliente</th><th class="d">Faturamento histórico</th>
     <th>Última compra</th><th class="d">Dias sem comprar</th></tr></thead><tbody>`;
   lista.forEach(c => {
-    h += `<tr><td>${c.nome}</td><td class="d num">${brl(c.fat)}</td>
-      <td class="num">${dbr(c.ult)}</td>
-      <td class="d num" style="color:var(--baixa)">${c.dias}</td></tr>`;
+    h += `<tr><td>${c.nome}</td><td class="d num" data-rot="Faturamento histórico">${brl(c.fat)}</td>
+      <td class="num" data-rot="Última compra">${dbr(c.ult)}</td>
+      <td class="d num" data-rot="Dias sem comprar" style="color:var(--baixa)">${c.dias}</td></tr>`;
   });
   r.innerHTML = h + '</tbody></table>';
   s.appendChild(r);
@@ -1269,7 +1534,7 @@ function secPerdidos(B, hoje, jan, filtroMes){
 /* ---------- 6.6 cadência ---------- */
 function secCadencia(B, hoje, filtroMes){
   const { H, ref } = corteHistorico(B, hoje, filtroMes);
-  const s = el('section');
+  const s = el('section'); s.id = 'sec-cadencia';
   cabecalho(s, 'Retomada por cadência', 'worklist', filtroMes ? `como estava em ${dbr(ref)}` : null);
 
   const m = {};
@@ -1309,18 +1574,18 @@ function secCadencia(B, hoje, filtroMes){
     pnKpi.appendChild(kpi('Na hora de ligar', mil(fila.length), `atraso de ${corte} dias ou mais`));
     pnKpi.appendChild(kpi('Receita de 12 meses na fila', brl(fila.reduce((a,b)=>a+b.r12,0)), 'peso financeiro desses clientes'));
 
-    let h = `<table><thead><tr><th>Cliente</th><th class="d">Compra a cada</th><th class="d">Compras</th>
+    let h = `<table data-empilhar><thead><tr><th>Cliente</th><th class="d">Compra a cada</th><th class="d">Compras</th>
       <th>Última compra</th><th class="d">Dias sem comprar</th><th class="d">Atraso</th>
       <th class="d">Receita 12m</th></tr></thead><tbody>`;
     if(!fila.length) h += `<tr><td colspan="7" style="color:var(--grafite);padding:24px;text-align:center">Ninguém atrasado nesse corte. Aumente o corte ou comemore.</td></tr>`;
     fila.forEach(l => {
       h += `<tr><td>${l.nome}</td>
-        <td class="d num">${l.ritmo} d</td>
-        <td class="d num">${l.n}</td>
-        <td class="num">${dbr(l.ult)}</td>
-        <td class="d num">${l.semComprar}</td>
-        <td class="d"><span class="pill at">+${l.atraso} d</span></td>
-        <td class="d num">${brl(l.r12)}</td></tr>`;
+        <td class="d num" data-rot="Compra a cada">${l.ritmo} d</td>
+        <td class="d num" data-rot="Compras">${l.n}</td>
+        <td class="num" data-rot="Última compra">${dbr(l.ult)}</td>
+        <td class="d num" data-rot="Dias sem comprar">${l.semComprar}</td>
+        <td class="d" data-rot="Atraso"><span class="pill at">+${l.atraso} d</span></td>
+        <td class="d num" data-rot="Receita 12m">${brl(l.r12)}</td></tr>`;
     });
     rolo.innerHTML = h + '</tbody></table>';
     [...abas.children].forEach(b => b.classList.toggle('on', +b.dataset.v === corte));
