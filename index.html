@@ -288,8 +288,6 @@ h2{
   color:var(--azul);background:var(--azul-claro);border:none;
   padding:3px 8px;border-radius:100px;
 }
-.nota{font-size:12px;color:var(--grafite);margin-top:14px;line-height:1.65;max-width:82ch}
-.nota b{color:var(--tinta);font-weight:600}
 
 /* ---------- cartões ---------- */
 .grade{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(196px,1fr))}
@@ -437,7 +435,7 @@ tbody tr:hover{background:var(--véu)}
     font-size:12.5px;padding:8px 12px;min-height:38px;
   }
   .ponto-filtro{
-    width:7px;height:7px;border-radius:50%;background:var(--menta);
+    display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--menta);
     box-shadow:0 0 0 2px rgba(255,255,255,.5);
   }
   .nav-secoes{
@@ -515,6 +513,7 @@ tbody tr:hover{background:var(--véu)}
   .rolo table[data-empilhar] tbody,
   .rolo table[data-empilhar] tr{display:block;width:100%}
   .rolo table[data-empilhar]{background:none}
+  .rolo:has(table[data-empilhar]){background:none;border:none;box-shadow:none}
   .rolo table[data-empilhar] tr{
     padding:14px 15px;margin:10px;border:1px solid var(--linha);border-radius:var(--r);
     box-shadow:var(--sombra);background:var(--carta);
@@ -923,7 +922,7 @@ function montarAnos(){
   anos.forEach(a => s.add(new Option(a, a)));
 }
 
-['#anoBase','#meta','#dias'].forEach(id => $(id).addEventListener('change', render));
+['#anoBase','#meta','#dias'].forEach(id => $(id).addEventListener('input', render));
 $('#btnPetmed').onclick = function(){
   PETMED_ON = !PETMED_ON;
   this.textContent = PETMED_ON ? 'Incluída' : 'Excluída';
