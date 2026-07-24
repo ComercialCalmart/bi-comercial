@@ -464,12 +464,22 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 }
 .fechar-x:hover{background:var(--azul-claro);color:var(--azul)}
 .fechar-x:active{transform:scale(.92)}
-.cliente-sub{color:var(--grafite);font-size:12.5px;margin:0 0 18px}
-.cliente-sub b{color:var(--tinta);font-weight:600;font-family:var(--mono)}
-/* O gráfico pode precisar de mais largura do que o popup tem (muitos
-   meses); em vez de espremer, rola de lado — o mesmo raciocínio do
-   graf-rolo mobile, só que aqui vale em qualquer tamanho de tela. */
-.cliente-rolo{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -8px;padding:0 8px 4px}
+.cliente-sub{color:var(--grafite);font-size:12.5px;margin:0 0 16px}
+/* Linha do topo do popup: abas de ano à esquerda, total abreviado à
+   direita — o mesmo valor que muda de cara quando você troca de aba. */
+.cliente-topo{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  gap:14px;flex-wrap:wrap;margin-bottom:16px;
+}
+.cliente-total{text-align:right}
+.cliente-total-valor{
+  font-family:var(--mono);font-size:23px;font-weight:600;
+  color:var(--tinta);letter-spacing:-.02em;line-height:1.05;
+}
+.cliente-total-rot{
+  font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--tenue);margin-top:2px;white-space:nowrap;
+}
 
 .zona{
   border:1px dashed #D8DFEE;border-radius:var(--r);padding:30px;text-align:center;
@@ -1124,17 +1134,19 @@ function serieMensalCliente(ck){
 }
 
 function linhaCliente(serie){
-  const largura = Math.max(560, serie.length * 46);
-  const H=260, e=54, d=16, t=20, b=36;
+  const W=680, H=240, e=52, d=16, t=20, b=32;
   const max = Math.max(...serie.map(p => p.valor), 1) * 1.15;
-  const lg = (largura-e-d) / Math.max(serie.length-1, 1);
+  const lg = (W-e-d) / Math.max(serie.length-1, 1);
   const y = v => t + (H-t-b) * (1 - v/max);
   const x = i => e + i*lg;
+  // Com muitos meses na tela (ex: "Tudo"), rotular cada um vira sopa de
+  // letrinhas — então rotula 1 a cada N, sempre incluindo o último mês.
+  const pulo = serie.length > 15 ? 3 : serie.length > 8 ? 2 : 1;
 
-  let g = `<svg style="width:auto;min-width:${largura}px;display:block" viewBox="0 0 ${largura} ${H}" role="img" aria-label="Faturamento mensal do cliente desde janeiro de 2025">`;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal do cliente">`;
   for(let i=0;i<=4;i++){
     const v = max*i/4, yy = y(v);
-    g += `<line x1="${e}" y1="${yy}" x2="${largura-d}" y2="${yy}" stroke="#EEF1F8"/>
+    g += `<line x1="${e}" y1="${yy}" x2="${W-d}" y2="${yy}" stroke="#EEF1F8"/>
           <text x="${e-8}" y="${yy+4}" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#8C94B2">${Math.round(v/1000)}k</text>`;
   }
   const pontos = serie.map((p,i) => `${x(i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ');
@@ -1144,30 +1156,66 @@ function linhaCliente(serie){
   serie.forEach((p,i) => {
     g += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.valor).toFixed(1)}" r="3.5" fill="var(--azul)" stroke="#fff" stroke-width="1.5">
             <title>${MES[p.mes]}/${p.ano}: ${brl(p.valor)}</title>
-          </circle>
-          <text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="10" fill="#5C6689">${MES[p.mes]}/${String(p.ano).slice(2)}</text>`;
+          </circle>`;
+    if(i % pulo === 0 || i === serie.length-1){
+      g += `<text x="${x(i).toFixed(1)}" y="${H-10}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="10" fill="#5C6689">${MES[p.mes]}/${String(p.ano).slice(2)}</text>`;
+    }
   });
-  g += `<line x1="${e}" y1="${H-b}" x2="${largura-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
+  g += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
   return g;
 }
 
-function abrirClienteModal(ck, nome){
-  const serie = serieMensalCliente(ck);
-  $('#clienteNome').textContent = nome;
-  const zona = $('#clienteGraficoZona');
+// R$ 445.000,00 vira "445k" — só pro número grande do canto, que
+// precisa bater o olho rápido, não pedir conta. O resto do dashboard
+// continua com o valor por extenso (brl()); essa abreviação é local.
+function abrevBRL(v){
+  const sinal = v < 0 ? '−' : '';
+  const av = Math.abs(v);
+  if(av >= 1000000) return sinal + (av/1000000).toFixed(1).replace('.',',') + 'M';
+  if(av >= 1000) return sinal + Math.round(av/1000) + 'k';
+  return sinal + Math.round(av);
+}
 
-  if(!serie.length){
+let CLIENTE_SERIE = [];        // série completa (jan/2025 → hoje) do cliente aberto no popup
+let CLIENTE_ANO_FILTRO = 'tudo'; // 'tudo' ou um ano específico — reseta a cada abertura
+
+function abrirClienteModal(ck, nome){
+  CLIENTE_SERIE = serieMensalCliente(ck);
+  CLIENTE_ANO_FILTRO = 'tudo';
+  $('#clienteNome').textContent = nome;
+  pintarClienteModal();
+  $('#fundoCliente').classList.add('on');
+}
+
+function pintarClienteModal(){
+  const zona = $('#clienteGraficoZona');
+  if(!CLIENTE_SERIE.length){
     zona.innerHTML = `<div class="vazio" style="padding:28px 14px"><h3>Sem histórico suficiente</h3>
       <p style="margin:0">Não há faturamento registrado para montar o gráfico deste cliente.</p></div>`;
     $('#clienteSub').textContent = '';
-  } else {
-    const total = serie.reduce((a,p) => a+p.valor, 0);
-    const comCompra = serie.filter(p => p.valor > 0).length;
-    $('#clienteSub').innerHTML =
-      `Desde jan/2025 · <b>${brl(total)}</b> no período · ${comCompra} de ${serie.length} meses com compra`;
-    zona.innerHTML = `<div class="cliente-rolo">${linhaCliente(serie)}</div>`;
+    return;
   }
-  $('#fundoCliente').classList.add('on');
+
+  const serie = CLIENTE_ANO_FILTRO === 'tudo'
+    ? CLIENTE_SERIE
+    : CLIENTE_SERIE.filter(p => p.ano === CLIENTE_ANO_FILTRO);
+  const anos = [...new Set(CLIENTE_SERIE.map(p => p.ano))];
+  const total = serie.reduce((a,p) => a+p.valor, 0);
+  const comCompra = serie.filter(p => p.valor > 0).length;
+
+  let abas = `<button class="aba ${CLIENTE_ANO_FILTRO==='tudo'?'on':''}" data-ano-cliente="tudo">Tudo</button>`;
+  anos.forEach(a => { abas += `<button class="aba ${CLIENTE_ANO_FILTRO===a?'on':''}" data-ano-cliente="${a}">${a}</button>`; });
+
+  $('#clienteSub').textContent = `${comCompra} de ${serie.length} meses com compra`;
+  zona.innerHTML = `
+    <div class="cliente-topo">
+      <div class="abas" style="margin-bottom:0">${abas}</div>
+      <div class="cliente-total">
+        <div class="cliente-total-valor">${abrevBRL(total)}</div>
+        <div class="cliente-total-rot">acumulado ${CLIENTE_ANO_FILTRO==='tudo' ? 'no período' : 'em '+CLIENTE_ANO_FILTRO}</div>
+      </div>
+    </div>
+    ${linhaCliente(serie)}`;
 }
 
 $('#main').addEventListener('click', e => {
@@ -1180,6 +1228,12 @@ $('#main').addEventListener('keydown', e => {
   if(!tr) return;
   e.preventDefault();
   abrirClienteModal(tr.dataset.ck, tr.dataset.nome);
+});
+$('#clienteGraficoZona').addEventListener('click', e => {
+  const btn = e.target.closest('[data-ano-cliente]');
+  if(!btn) return;
+  CLIENTE_ANO_FILTRO = btn.dataset.anoCliente === 'tudo' ? 'tudo' : +btn.dataset.anoCliente;
+  pintarClienteModal();
 });
 
 $('#btnFecharCliente').onclick = () => $('#fundoCliente').classList.remove('on');
