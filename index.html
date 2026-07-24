@@ -283,22 +283,6 @@ header .marca span{color:var(--menta)}
 }
 @media(max-width:640px){ .resumo{padding:20px 20px 22px} .resumo-valor{font-size:25px} }
 
-/* ---------- ajuda colapsável ---------- */
-.ajuda{
-  width:19px;height:19px;border-radius:50%;border:1px solid var(--linha);
-  background:var(--carta);color:var(--tenue);font-family:var(--mono);font-size:10.5px;
-  font-weight:600;display:grid;place-items:center;padding:0;flex:0 0 auto;
-  transition:background var(--rapido), color var(--rapido), border-color var(--rapido);
-}
-.ajuda:hover{background:var(--azul-claro);color:var(--azul);border-color:var(--azul-claro)}
-.ajuda[aria-expanded="true"]{background:var(--azul);color:#fff;border-color:var(--azul)}
-.nota{
-  font-size:12px;color:var(--grafite);line-height:1.65;max-width:82ch;
-  display:none;margin-top:14px;
-}
-.nota.aberta{display:block;animation:entra .18s var(--curva) both}
-.nota b{color:var(--tinta);font-weight:600}
-
 /* ---------- dica de interação ---------- */
 .dica{
   display:inline-flex;align-items:center;gap:5px;font-size:9.5px;letter-spacing:.06em;
@@ -410,8 +394,13 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 .pill.no{background:var(--baixa-fundo);color:var(--baixa)}
 .pill.at{background:var(--azul-claro);color:var(--azul)}
 .abas{display:flex;gap:7px;margin-bottom:14px}
-.abcGrid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;align-items:start}
+.abcGrid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
 @media(max-width:860px){ .abcGrid{grid-template-columns:1fr} }
+/* Sem align-items:start os dois cartões esticam pra mesma altura (o
+   padrão do grid), então a tabela e o donut sempre terminam na mesma
+   linha. O donut, que naturalmente é mais baixo, usa a sobra de altura
+   pra centralizar o próprio conteúdo em vez de deixar vazio embaixo. */
+.painel-donut{display:flex;flex-direction:column;justify-content:center}
 .aba{
   border:1px solid var(--linha);background:var(--carta);padding:6px 14px;
   border-radius:100px;font-size:12.5px;font-weight:500;color:var(--grafite);
@@ -548,10 +537,9 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
   .filtros-corpo .ref{width:100%;text-align:left;margin:2px 0 0;padding-top:14px;border-top:1px solid var(--linha-fina)}
 
   /* ---- toque: nada abaixo de ~44px, ninguém erra o alvo ---- */
-  button,.btn,.btn-h,.aba,.ajuda,.classe,select,input{touch-action:manipulation}
+  button,.btn,.btn-h,.aba,.classe,select,input{touch-action:manipulation}
   .btn-h{min-height:40px;padding:8px 14px}
   .aba{min-height:40px;padding:9px 16px;display:inline-flex;align-items:center}
-  .ajuda{width:26px;height:26px;font-size:12px}
   #btnOlho{width:40px;height:40px}
   .ctrl input,.ctrl select{min-height:40px;padding:9px 11px}
   .ctrl input{width:64px}
@@ -1378,20 +1366,6 @@ function cabecalho(pai, titulo, tag, nota, dica){
     d.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3h9l3 3-3 3H2z"/></svg>${dica}`;
     c.appendChild(d);
   }
-  // "?" abre/fecha a nota explicativa que a própria seção anexa no final.
-  // Procurada em tempo de clique, não de criação, porque a nota ainda
-  // nem existe quando o cabeçalho é montado.
-  const btnAjuda = el('button','ajuda','?');
-  btnAjuda.type = 'button';
-  btnAjuda.setAttribute('aria-expanded', 'false');
-  btnAjuda.setAttribute('aria-label', 'Explicação desta seção');
-  btnAjuda.onclick = () => {
-    const nota = pai.querySelector(':scope > .nota');
-    if(!nota) return;
-    const aberta = nota.classList.toggle('aberta');
-    btnAjuda.setAttribute('aria-expanded', String(aberta));
-  };
-  c.appendChild(btnAjuda);
   if(nota){
     const n = el('span',null,nota);
     n.style.cssText = 'font-size:11.5px;color:var(--grafite);font-family:var(--mono);margin-left:auto';
@@ -1638,10 +1612,6 @@ function secCarteira(B, ano, hoje, jan, filtroMes){
   g.appendChild(kpi('Perdidos', mil(perdidos), `${todos.length ? (perdidos/todos.length*100).toFixed(0) : 0}% da carteira`));
   g.appendChild(kpi(`Novos em ${ano}`, mil(novos), 'primeira compra no ano'));
   s.appendChild(g);
-  s.insertAdjacentHTML('beforeend',
-    `<p class="nota"><b>Regra única:</b> ativo = comprou nos últimos ${jan} dias. Perdido = não comprou.
-     Total = ativos + perdidos, sempre fecha. Sem zona cinzenta.
-     ${filtroMes ? `Com um mês em foco, tudo é recalculado como se a última nota fosse de ${dbr(ref)}, ignorando compras depois disso.` : ''}</p>`);
   return s;
 }
 
@@ -1650,7 +1620,7 @@ function secABC(B, ano, hoje, jan, filtroMes){
   const s = el('section'); s.id = 'sec-abc';
   const noMes = !!(filtroMes && filtroMes.ano === ano);
   const titulo = noMes ? `Maiores clientes · curva ABC · ${MES[filtroMes.mes]}/${ano}` : `Maiores clientes · curva ABC ${ano}`;
-  cabecalho(s, titulo, 'pareto');
+  cabecalho(s, titulo);
 
   const doPeriodo = B.filter(r => r.dt.getUTCFullYear() === ano && (!noMes || r.dt.getUTCMonth() === filtroMes.mes));
   const m = {};
@@ -1717,12 +1687,6 @@ function secABC(B, ano, hoje, jan, filtroMes){
   grid.appendChild(r);
   grid.appendChild(donutABC(lista, tot, noMes ? MES[filtroMes.mes]+'/'+ano : String(ano)));
   s.appendChild(grid);
-
-  s.insertAdjacentHTML('beforeend',
-    `<p class="nota"><b>A</b> = 80% do faturamento · <b>B</b> = próximos 15% · <b>C</b> = últimos 5%.
-     Foco: blindar os A e converter B em A. Grupos econômicos aparecem somados, para não subestimar
-     a dependência de poucos donos reais. "Última compra" e "situação" olham sempre para o histórico
-     inteiro, mesmo com um mês em foco na faixa acima.</p>`);
   return s;
 }
 
@@ -1739,12 +1703,12 @@ function tintaAzul(nivel){
 /* ---------- 6.3b donut da curva ABC (mesmos dados da tabela acima) ---------- */
 function donutABC(lista, tot, rotulo){
   if(!lista.length || tot <= 0){
-    const vazio = el('div','vazio'); vazio.style.padding = '28px 14px';
+    const vazio = el('div','vazio'); vazio.style.cssText = 'padding:28px 14px;display:flex;flex-direction:column;justify-content:center;height:100%';
     vazio.innerHTML = `<h3>Sem dados disponíveis</h3>
       <p style="margin:0">Não há faturamento suficiente no período em foco para montar o gráfico.</p>`;
     return vazio;
   }
-  const card = el('div','painel');
+  const card = el('div','painel painel-donut');
 
   const MAXFATIAS = 7;
   const fatias = lista.slice(0, MAXFATIAS).map((c,i) => ({ nome:c.nome, share:c.share, cor:tintaAzul(i) }));
@@ -1849,10 +1813,6 @@ function secCompradores(B, ano, filtroMes){
   sv += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
   pn.innerHTML = `<div class="graf-rolo">${sv}</div>`;
   s.appendChild(pn);
-  s.insertAdjacentHTML('beforeend',
-    `<p class="nota">Cada barra conta clientes únicos <b>naquele mês</b>. Quem compra em três meses
-     aparece nas três barras, mas conta uma vez só no acumulado do ano. Clique numa barra para focar
-     o relatório inteiro nesse mês.</p>`);
   return s;
 }
 
@@ -1896,9 +1856,6 @@ function secPerdidos(B, hoje, jan, filtroMes){
   });
   r.innerHTML = h + '</tbody></table>';
   s.appendChild(r);
-  s.insertAdjacentHTML('beforeend',
-    `<p class="nota">Ordenado por faturamento histórico: quem pesa mais no bolso aparece primeiro,
-     não quem sumiu há mais tempo.</p>`);
   return s;
 }
 
@@ -1983,13 +1940,6 @@ function secCadencia(B, hoje, filtroMes){
     abas.appendChild(b);
   });
   pintar();
-
-  s.insertAdjacentHTML('beforeend',
-    `<p class="nota"><b>Como ler:</b> "compra a cada" é a mediana do intervalo entre as compras
-     <b>daquele cliente</b>, então se adapta a quem compra semanal, mensal ou trimestral, sem faixa fixa.
-     "Atraso" é quantos dias passaram além do ponto em que a próxima compra era esperada.
-     Não é nota de cliente, é lembrete de ligação. Ficam de fora o Galpão Drop e quem tem menos de
-     ${CONFIG.MIN_COMPRAS_RITMO} compras, porque aí não dá para medir ritmo.</p>`);
   return s;
 }
 
