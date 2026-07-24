@@ -153,14 +153,20 @@ header .marca span{color:var(--menta)}
 .btn-h.on{background:var(--azul-neon);border-color:var(--azul-neon)}
 
 .barra{
-  position:sticky;top:54px;z-index:30;background:rgba(255,255,255,.9);
+  position:sticky;top:54px;z-index:30;background:rgba(255,255,255,.92);
   backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);
-  border-bottom:1px solid var(--linha);padding:12px 22px;
+  border-bottom:1px solid var(--linha-fina);padding:10px 22px;
   display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;
 }
-.ctrl label{margin-bottom:5px}
+/* Legenda de campo (Ano-base, Meta, PETMED...) sem caixa alta e sem
+   tracking — o rótulo de grupo acima já marca a seção; o campo em si
+   só precisa ser lido rápido, não anunciado. */
+.ctrl label{
+  text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px;
+  color:var(--tenue);margin-bottom:4px;
+}
 .ctrl input,.ctrl select{
-  padding:6px 10px;border:1px solid var(--linha);border-radius:var(--r-p);
+  padding:6px 10px;border:1px solid var(--linha-fina);border-radius:var(--r-p);
   background:var(--véu);color:var(--tinta);
   transition:border-color var(--rapido), box-shadow var(--rapido), background var(--rapido);
 }
@@ -168,10 +174,10 @@ header .marca span{color:var(--menta)}
 .ctrl input:focus,.ctrl select:focus{border-color:var(--azul-neon);background:var(--carta);outline:none;box-shadow:var(--foco)}
 .ctrl input{width:78px}
 .ctrl .btn-h{
-  background:var(--carta);border-color:var(--linha);color:var(--tinta);
+  background:var(--carta);border-color:var(--linha-fina);color:var(--tinta);
 }
 .ctrl .btn-h:hover{background:var(--papel);border-color:#D3DAEA}
-.ref{margin-left:auto;font-size:11px;color:var(--tenue);font-family:var(--mono);text-align:right;line-height:1.5}
+.ref{margin-left:auto;font-size:10.5px;color:var(--tenue);font-family:var(--mono);text-align:right;line-height:1.5}
 .selo{
   display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
   font-weight:600;letter-spacing:.03em;padding:2px 8px;border-radius:100px;margin-bottom:4px;
@@ -184,10 +190,12 @@ header .marca span{color:var(--menta)}
 .selo.velho{background:var(--baixa-fundo);color:var(--baixa)}
 .selo.velho i{background:var(--baixa)}
 
-.divisor-ctrl{width:1px;align-self:stretch;background:var(--linha);margin:0 2px}
+.divisor-ctrl{width:1px;align-self:stretch;background:var(--linha-fina);margin:0 2px}
 .grupo-ctrl{display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap}
+/* Rótulo de grupo: continua maiúsculo (é convenção de seção em todo o
+   resto do arquivo), mas com menos tracking — marca a seção sem gritar. */
 .rot-grupo{
-  font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;
+  font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;
   color:var(--tenue);margin-bottom:5px;width:100%;
 }
 .estado-ativo .btn-h{box-shadow:var(--sombra)}
@@ -238,6 +246,30 @@ header .marca span{color:var(--menta)}
 .status-alta .resumo-selo{background:rgba(149,223,194,.16);color:var(--menta)}
 .status-atencao .resumo-selo{background:rgba(255,193,110,.18);color:#FFC16E}
 .status-baixa .resumo-selo{background:rgba(255,158,147,.18);color:#FF9E93}
+
+/* ---------- bloco 1: meta anual (barra de progresso + ritmo) ---------- */
+.meta-barra{
+  height:6px;border-radius:100px;background:rgba(255,255,255,.14);
+  margin:14px 0 10px;overflow:hidden;
+}
+.meta-barra-fill{height:100%;border-radius:100px;transition:width .5s var(--curva)}
+.status-alta .meta-barra-fill{background:var(--menta)}
+.status-atencao .meta-barra-fill{background:#FFC16E}
+.status-baixa .meta-barra-fill{background:#FF9E93}
+.meta-linha{font-size:12.5px;color:rgba(255,255,255,.72);line-height:1.5;margin-bottom:10px}
+.meta-linha b{color:#fff;font-weight:600}
+.meta-ritmo{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:11.5px;
+  color:rgba(255,255,255,.55);padding-top:10px;border-top:1px solid rgba(255,255,255,.12);
+}
+.ritmo-chip{
+  font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;padding:2px 7px;border-radius:100px;white-space:nowrap;
+}
+.status-alta .ritmo-chip{background:rgba(149,223,194,.18);color:var(--menta)}
+.status-atencao .ritmo-chip{background:rgba(255,193,110,.2);color:#FFC16E}
+.status-baixa .ritmo-chip{background:rgba(255,158,147,.2);color:#FF9E93}
+
 @media(max-width:780px){
   .resumo-grade{grid-template-columns:1fr;gap:20px}
   .resumo-bloco{padding:0 0 18px!important;border:none!important}
@@ -1201,6 +1233,25 @@ function blocoResumo(status, label, valor, unidade, contextoHtml){
   return b;
 }
 
+// Bloco 1 do resumo (meta anual): mesma anatomia do blocoResumo — rótulo,
+// número grande, contexto — só que com barra de progresso e uma linha de
+// ritmo a mais. Só existe pra esse bloco porque só ele tem meta contra
+// a qual progredir; os outros dois são contagens, não perseguição de alvo.
+function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra){
+  const b = el('div', 'resumo-bloco resumo-meta status-' + status);
+  const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
+  const val = el('div','resumo-valor'); val.textContent = valor;
+  const barra = el('div','meta-barra');
+  const fill = el('div','meta-barra-fill');
+  fill.style.width = Math.min(Math.max(pct,0),100) + '%';
+  barra.appendChild(fill);
+  const linha = el('div','meta-linha'); linha.innerHTML = linhaMeta;
+  b.append(lab, val, barra, linha);
+  if(linhaRitmo){ const rt = el('div','meta-ritmo'); rt.innerHTML = linhaRitmo; b.appendChild(rt); }
+  if(contextoExtra){ const cx = el('div','resumo-contexto'); cx.style.marginTop='8px'; cx.innerHTML = contextoExtra; b.appendChild(cx); }
+  return b;
+}
+
 /* ---------- 6.0 resumo (estado da união) ---------- */
 // Sempre reflete o estado atual de verdade (não usa FILTRO_MES): é o
 // "pulso" do negócio, a leitura de baixo não deveria mudar o resumo
@@ -1212,23 +1263,54 @@ function secResumo(B, ano, meta, jan, hoje){
   div.appendChild(el('span','rot-grupo','Resumo de hoje'));
   const grade = el('div','resumo-grade');
 
-  // 1. faturamento acumulado vs meta
+  // 1. meta anual (implícita: faturamento total do ano passado inteiro
+  // × (1+meta%) — não existe campo de "meta anual em R$" em lugar
+  // nenhum, então essa é a única meta anual que dá pra calcular sem
+  // inventar uma regra de negócio nova. É construída só com o que já
+  // existe: os 12 meses de A/P e o % de crescimento configurado.
   const A = new Array(12).fill(0), P = new Array(12).fill(0);
   B.forEach(r => {
     const y = r.dt.getUTCFullYear(), i = r.dt.getUTCMonth();
     if(y === ano)   A[i] += r.valor;
     if(y === ano-1) P[i] += r.valor;
   });
-  const ultimo = Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth()));
+  const temAno = B.some(r => r.dt.getUTCFullYear() === ano);
+  const ultimo = temAno ? Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth())) : 0;
   const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
   const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-  const metaAcum = accP*(1+meta);
+  const metaAcum = accP*(1+meta);                 // comparação de sempre: mesmo período do ano passado
   const difMeta = metaAcum ? (accA/metaAcum - 1)*100 : 0;
-  grade.appendChild(blocoResumo(
-    difMeta >= 0 ? 'alta' : 'baixa',
-    `Faturamento acumulado ${ano}`,
-    brl(accA), null,
-    `<span class="resumo-selo">${difMeta>=0?'+':'−'}${Math.abs(difMeta).toFixed(1).replace('.',',')}%</span> vs. meta de ${brl(metaAcum)}`
+
+  const metaAnual = P.reduce((a,b)=>a+b,0) * (1+meta);   // meta anual implícita: ano passado inteiro + meta%
+  const temMetaAnual = temAno && metaAnual > 0;
+  const faltamAnual = metaAnual - accA;
+  const pctAnual = temMetaAnual ? accA/metaAnual*100 : 0;
+  const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
+  const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
+  let ritmoNecessario = null, acimaDoRitmo = null;
+  if(temMetaAnual){
+    if(faltamAnual <= 0) acimaDoRitmo = true;
+    else if(mesesRestantes > 0){ ritmoNecessario = faltamAnual/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
+    else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
+  }
+  const statusMeta = !temMetaAnual ? 'atencao' : acimaDoRitmo ? 'alta' : 'baixa';
+
+  const linhaMeta = !temMetaAnual
+    ? `Sem faturamento em ${ano-1} para calcular uma meta anual.`
+    : faltamAnual > 0
+      ? `${pctAnual.toFixed(0)}% de <b>${brl(metaAnual)}</b> · faltam ${brl(faltamAnual)}`
+      : `${pctAnual.toFixed(0)}% de <b>${brl(metaAnual)}</b> · meta batida, ${brl(-faltamAnual)} acima`;
+
+  const chip = acimaDoRitmo == null ? ''
+    : `<span class="ritmo-chip">${acimaDoRitmo ? 'acima do ritmo' : 'abaixo do ritmo'}</span>`;
+  const linhaRitmo = !temMetaAnual ? null
+    : ritmoNecessario != null
+      ? `${chip} ritmo atual ${brl(ritmoAtual)}/mês · necessário ${brl(ritmoNecessario)}/mês`
+      : `${chip} ritmo atual ${brl(ritmoAtual)}/mês`;
+
+  grade.appendChild(blocoMeta(
+    statusMeta, `Meta anual · ${ano}`, brl(accA), pctAnual, linhaMeta, linhaRitmo,
+    `<span class="resumo-selo">${difMeta>=0?'+':'−'}${Math.abs(difMeta).toFixed(1).replace('.',',')}%</span> vs. mesmo período de ${ano-1}`
   ));
 
   // 2. clientes atrasados na cadência (mesmo cálculo de secCadencia,
