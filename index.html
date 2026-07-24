@@ -1338,7 +1338,7 @@ $('#fabImportar').onclick = () => { fundo.classList.add('on'); };
 // É o único jeito de saber se a importação semanal está em dia.
 function seloAtualizacao(hoje){
   const agora = new Date();
-  const agoraUTC = new Date(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate()));
+  const agoraUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()));
   const dias = diasEntre(hoje, agoraUTC);
   const [nivel, texto] = dias <= 2 ? ['fresco','atualizado']
     : dias <= 7 ? ['atencao','verificar import.']
@@ -1467,8 +1467,14 @@ function blocoDuplo(mini1, mini2){
 // função porque agora os dois blocos existem ao mesmo tempo, sempre.
 function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   if(periodo === 'mes'){
-    const diaAtual = hoje.getUTCDate();
     const diasNoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
+    // "Dia de hoje" só faz sentido pro mês que está de fato em andamento
+    // (mesmo ano e mesmo mês de "hoje"). Se o Ano-base estiver puxado
+    // pra um ano já fechado, esse mês já acabou — trata como 100%
+    // decorrido (dia = último dia do mês), em vez de usar o dia do
+    // relógio real, que pertenceria a um mês completamente diferente.
+    const mesEmAndamento = (ano === hoje.getUTCFullYear() && ultimo === hoje.getUTCMonth());
+    const diaAtual = mesEmAndamento ? hoje.getUTCDate() : diasNoMes;
     const realizado = A[ultimo] || 0;
     const metaPeriodo = (P[ultimo] || 0) * (1+meta);
     const temMeta = temAno && metaPeriodo > 0;
