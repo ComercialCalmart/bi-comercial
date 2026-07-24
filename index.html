@@ -344,6 +344,18 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr{transition:background var(--rapido)}
 tbody tr:hover{background:var(--véu)}
 .d{text-align:right}
+
+/* ---------- cabeçalho ordenável ---------- */
+th[data-sort]{cursor:pointer;user-select:none;transition:color var(--rapido)}
+th[data-sort]:hover{color:var(--azul)}
+th[data-sort] .seta{
+  display:inline-block;margin-left:5px;font-size:8px;opacity:.32;
+  color:var(--tenue);transition:opacity var(--rapido),color var(--rapido);
+}
+th[data-sort][aria-sort="ascending"],
+th[data-sort][aria-sort="descending"]{color:var(--azul)}
+th[data-sort][aria-sort="ascending"] .seta,
+th[data-sort][aria-sort="descending"] .seta{opacity:1;color:var(--azul-neon)}
 .classe{
   font-family:var(--mono);font-size:10.5px;font-weight:600;
   padding:2px 7px;border-radius:100px;
@@ -768,6 +780,16 @@ let PENDENTE = null;       // linhas parseadas aguardando gravação
 let PETMED_ON = true;
 let PODE_IMPORTAR = false;  // definido no login, a partir da tabela perfis
 let FILTRO_MES = null;      // {ano, mes} quando uma coluna do gráfico está selecionada
+let CORTE_CADENCIA = CONFIG.ATRASO_MINIMO; // aba de dias escolhida em Cadência, sobrevive a qualquer re-render
+
+// Estado de ordenação por clique de cabeçalho, um por tabela. col=null
+// significa "usa a ordem padrão de cada seção" (a que já fazia sentido
+// antes de existir ordenação manual: maior faturamento primeiro, etc.).
+let SORT = {
+  abc:      { col:null, dir:null },
+  perdidos: { col:null, dir:null },
+  cadencia: { col:null, dir:null }
+};
 
 /* ==========================================================
    3. LOGIN
@@ -943,6 +965,58 @@ $('#main').addEventListener('click', e => {
   FILTRO_MES = (FILTRO_MES && FILTRO_MES.mes === mes && FILTRO_MES.ano === ano)
     ? null : { mes, ano };
   render();
+});
+
+/* ---------- cabeçalhos ordenáveis (ABC, Perdidos, Cadência) ----------
+   Clicar ordena crescente; clicar de novo no mesmo cabeçalho inverte.
+   O estado mora em SORT (fora da função de cada seção), então sobrevive
+   ao re-render inteiro que qualquer clique de tabela dispara. */
+function thOrd(texto, chave, tabela, opcoes={}){
+  const estado = SORT[tabela];
+  const ativo = estado.col === chave;
+  const dirTxt = ativo ? (estado.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  const seta = ativo ? (estado.dir === 'asc' ? '▲' : '▼') : '⇅';
+  return `<th data-sort="${chave}" data-tabela="${tabela}" data-tipo="${opcoes.tipo||'numero'}"
+    aria-sort="${dirTxt}" tabindex="0" role="button"${opcoes.alinhar==='d' ? ' class="d"' : ''}
+    >${texto}<span class="seta">${seta}</span></th>`;
+}
+
+// Ordena uma cópia da lista conforme o clique mais recente naquela
+// tabela. Sem clique ainda (col=null), devolve a lista como veio —
+// a ordem padrão de cada seção continua sendo a de sempre.
+function ordenar(lista, tabela, acessores){
+  const estado = SORT[tabela];
+  const acc = estado.col && acessores[estado.col];
+  if(!acc) return lista;
+  const copia = [...lista].sort((a,b) => {
+    const va = acc(a), vb = acc(b);
+    if(va == null) return vb == null ? 0 : 1;
+    if(vb == null) return -1;
+    if(va < vb) return -1;
+    if(va > vb) return 1;
+    return 0;
+  });
+  if(estado.dir === 'desc') copia.reverse();
+  return copia;
+}
+
+function alternarOrdenacao(th){
+  const tabela = th.dataset.tabela, coluna = th.dataset.sort;
+  const estado = SORT[tabela];
+  if(estado.col === coluna) estado.dir = estado.dir === 'asc' ? 'desc' : 'asc';
+  else { estado.col = coluna; estado.dir = th.dataset.tipo === 'texto' ? 'asc' : 'desc'; }
+  render();
+}
+$('#main').addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if(th) alternarOrdenacao(th);
+});
+$('#main').addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const th = e.target.closest('th[data-sort]');
+  if(!th) return;
+  e.preventDefault();
+  alternarOrdenacao(th);
 });
 
 function atualizarChipFiltro(){
@@ -1317,8 +1391,9 @@ function secABC(B, ano, hoje, jan, filtroMes){
   const lista = Object.entries(m).map(([k,v]) => ({k, ...v})).sort((a,b)=>b.fat-a.fat);
   const tot = lista.reduce((a,b)=>a+b.fat,0);
   let acc = 0;
-  lista.forEach(c => { acc += c.fat; c.acc = acc/tot*100; c.share = c.fat/tot*100;
-    c.classe = c.acc <= 80 ? 'A' : c.acc <= 95 ? 'B' : 'C'; });
+  lista.forEach((c,i) => { acc += c.fat; c.acc = acc/tot*100; c.share = c.fat/tot*100;
+    c.classe = c.acc <= 80 ? 'A' : c.acc <= 95 ? 'B' : 'C';
+    c.pos = i+1; c.ultima = ultGeral[c.k]; c.diasSemComprar = diasEntre(ultGeral[c.k], hoje); });
 
   const nA = lista.filter(c=>c.classe==='A').length;
   const g = el('div','grade');
@@ -1327,23 +1402,40 @@ function secABC(B, ano, hoje, jan, filtroMes){
   g.appendChild(kpi('Concentração no top 5', (lista.slice(0,5).reduce((a,b)=>a+b.share,0)).toFixed(1).replace('.',',')+'%', noMes ? 'do faturamento do mês' : 'do faturamento do ano'));
   s.appendChild(g);
 
+  // A ordenação por clique só reordena a exibição da tabela. Posição,
+  // classe, % acumulado e o donut continuam vindo da ordem original
+  // por faturamento (é o que dá sentido ao Pareto) — só quem muda de
+  // posição na tela é a linha, nunca o cálculo por trás dela.
+  const listaOrdenada = ordenar(lista, 'abc', {
+    pos: c => c.pos,
+    classe: c => c.classe,
+    cliente: c => c.nome.toLowerCase(),
+    faturamento: c => c.fat,
+    pctTotal: c => c.share,
+    pctAcum: c => c.acc,
+    nfs: c => c.nfs.size,
+    ultima: c => c.ultima ? c.ultima.getTime() : -Infinity,
+    situacao: c => c.diasSemComprar
+  });
+
   const r = el('div','rolo'); r.style.maxHeight='460px'; r.style.overflowY='auto';
   let h = `<table data-empilhar class="abc"><thead><tr>
-    <th>#</th><th>Classe</th><th>Cliente</th><th class="d">Faturamento</th>
-    <th class="d">% total</th><th class="d">% acum.</th><th class="d">NFs</th>
-    <th>Última compra</th><th>Situação</th></tr></thead><tbody>`;
-  lista.forEach((c,i) => {
-    const dd = diasEntre(ultGeral[c.k], hoje);
+    ${thOrd('#','pos','abc',{tipo:'texto'})}${thOrd('Classe','classe','abc',{tipo:'texto'})}${thOrd('Cliente','cliente','abc',{tipo:'texto'})}
+    ${thOrd('Faturamento','faturamento','abc',{alinhar:'d'})}
+    ${thOrd('% total','pctTotal','abc',{alinhar:'d'})}${thOrd('% acum.','pctAcum','abc',{alinhar:'d'})}
+    ${thOrd('NFs','nfs','abc',{alinhar:'d'})}
+    ${thOrd('Última compra','ultima','abc')}${thOrd('Situação','situacao','abc')}</tr></thead><tbody>`;
+  listaOrdenada.forEach(c => {
     h += `<tr>
-      <td class="num" data-rot="Posição">${i+1}</td>
+      <td class="num" data-rot="Posição">${c.pos}</td>
       <td data-rot="Classe"><span class="classe c${c.classe}">${c.classe}</span></td>
       <td>${c.nome}</td>
       <td class="d num" data-rot="Faturamento">${brl(c.fat)}</td>
       <td class="d num" data-rot="% do total">${c.share.toFixed(1).replace('.',',')}%</td>
       <td class="d num" data-rot="% acumulado">${c.acc.toFixed(1).replace('.',',')}%</td>
       <td class="d num" data-rot="NFs">${c.nfs.size}</td>
-      <td class="num" data-rot="Última compra">${dbr(ultGeral[c.k])}</td>
-      <td data-rot="Situação"><span class="pill ${dd<=jan?'ok':'no'}">${dd<=jan?'ativo':dd+' dias'}</span></td>
+      <td class="num" data-rot="Última compra">${dbr(c.ultima)}</td>
+      <td data-rot="Situação"><span class="pill ${c.diasSemComprar<=jan?'ok':'no'}">${c.diasSemComprar<=jan?'ativo':c.diasSemComprar+' dias'}</span></td>
     </tr>`;
   });
   r.innerHTML = h + '</tbody></table>';
@@ -1515,9 +1607,16 @@ function secPerdidos(B, hoje, jan, filtroMes){
   s.appendChild(g);
 
   const r = el('div','rolo'); r.style.marginTop='12px'; r.style.maxHeight='400px'; r.style.overflowY='auto';
-  let h = `<table data-empilhar><thead><tr><th>Cliente</th><th class="d">Faturamento histórico</th>
-    <th>Última compra</th><th class="d">Dias sem comprar</th></tr></thead><tbody>`;
-  lista.forEach(c => {
+  const listaOrdenada = ordenar(lista, 'perdidos', {
+    cliente: c => c.nome.toLowerCase(),
+    faturamento: c => c.fat,
+    ultima: c => c.ult.getTime(),
+    dias: c => c.dias
+  });
+  let h = `<table data-empilhar><thead><tr>
+    ${thOrd('Cliente','cliente','perdidos',{tipo:'texto'})}${thOrd('Faturamento histórico','faturamento','perdidos',{alinhar:'d'})}
+    ${thOrd('Última compra','ultima','perdidos')}${thOrd('Dias sem comprar','dias','perdidos',{alinhar:'d'})}</tr></thead><tbody>`;
+  listaOrdenada.forEach(c => {
     h += `<tr><td>${c.nome}</td><td class="d num" data-rot="Faturamento histórico">${brl(c.fat)}</td>
       <td class="num" data-rot="Última compra">${dbr(c.ult)}</td>
       <td class="d num" data-rot="Dias sem comprar" style="color:var(--baixa)">${c.dias}</td></tr>`;
@@ -1557,7 +1656,6 @@ function secCadencia(B, hoje, filtroMes){
   });
 
   const comRitmo = linhas.length;
-  let corte = CONFIG.ATRASO_MINIMO;
   const abas = el('div','abas');
 
   const pnKpi = el('div','grade');
@@ -1567,17 +1665,29 @@ function secCadencia(B, hoje, filtroMes){
   s.appendChild(rolo);
 
   function pintar(){
-    const fila = linhas.filter(l => l.atraso >= corte).sort((a,b) => b.r12 - a.r12);
+    const fila = linhas.filter(l => l.atraso >= CORTE_CADENCIA).sort((a,b) => b.r12 - a.r12);
     pnKpi.innerHTML = '';
     pnKpi.appendChild(kpi('Clientes com cadência medível', mil(comRitmo), `${CONFIG.MIN_COMPRAS_RITMO}+ compras`));
-    pnKpi.appendChild(kpi('Na hora de ligar', mil(fila.length), `atraso de ${corte} dias ou mais`));
+    pnKpi.appendChild(kpi('Na hora de ligar', mil(fila.length), `atraso de ${CORTE_CADENCIA} dias ou mais`));
     pnKpi.appendChild(kpi('Receita de 12 meses na fila', brl(fila.reduce((a,b)=>a+b.r12,0)), 'peso financeiro desses clientes'));
 
-    let h = `<table data-empilhar><thead><tr><th>Cliente</th><th class="d">Compra a cada</th><th class="d">Compras</th>
-      <th>Última compra</th><th class="d">Dias sem comprar</th><th class="d">Atraso</th>
-      <th class="d">Receita 12m</th></tr></thead><tbody>`;
-    if(!fila.length) h += `<tr><td colspan="7" style="color:var(--grafite);padding:24px;text-align:center">Ninguém atrasado nesse corte. Aumente o corte ou comemore.</td></tr>`;
-    fila.forEach(l => {
+    const filaOrdenada = ordenar(fila, 'cadencia', {
+      cliente: c => c.nome.toLowerCase(),
+      ritmo: c => c.ritmo,
+      compras: c => c.n,
+      ultima: c => c.ult.getTime(),
+      dias: c => c.semComprar,
+      atraso: c => c.atraso,
+      receita: c => c.r12
+    });
+
+    let h = `<table data-empilhar><thead><tr>
+      ${thOrd('Cliente','cliente','cadencia',{tipo:'texto'})}${thOrd('Compra a cada','ritmo','cadencia',{alinhar:'d'})}
+      ${thOrd('Compras','compras','cadencia',{alinhar:'d'})}${thOrd('Última compra','ultima','cadencia')}
+      ${thOrd('Dias sem comprar','dias','cadencia',{alinhar:'d'})}${thOrd('Atraso','atraso','cadencia',{alinhar:'d'})}
+      ${thOrd('Receita 12m','receita','cadencia',{alinhar:'d'})}</tr></thead><tbody>`;
+    if(!filaOrdenada.length) h += `<tr><td colspan="7" style="color:var(--grafite);padding:24px;text-align:center">Ninguém atrasado nesse corte. Aumente o corte ou comemore.</td></tr>`;
+    filaOrdenada.forEach(l => {
       h += `<tr><td>${l.nome}</td>
         <td class="d num" data-rot="Compra a cada">${l.ritmo} d</td>
         <td class="d num" data-rot="Compras">${l.n}</td>
@@ -1587,13 +1697,16 @@ function secCadencia(B, hoje, filtroMes){
         <td class="d num" data-rot="Receita 12m">${brl(l.r12)}</td></tr>`;
     });
     rolo.innerHTML = h + '</tbody></table>';
-    [...abas.children].forEach(b => b.classList.toggle('on', +b.dataset.v === corte));
+    [...abas.children].forEach(b => b.classList.toggle('on', +b.dataset.v === CORTE_CADENCIA));
   }
 
   [21,30,45].forEach(v => {
     const b = el('button','aba', `${v} dias ou mais`);
     b.dataset.v = v;
-    b.onclick = () => { corte = v; pintar(); };
+    // Muda o estado persistido e refaz o render inteiro — mesmo padrão
+    // do clique de mês e do clique de cabeçalho, então o corte escolhido
+    // aqui sobrevive a qualquer uma dessas outras interações também.
+    b.onclick = () => { CORTE_CADENCIA = v; render(); };
     abas.appendChild(b);
   });
   pintar();
