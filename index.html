@@ -214,9 +214,12 @@ header .marca span{color:var(--menta)}
 .resumo{
   background:linear-gradient(155deg, var(--azul-forte) 0%, #001033 100%);
   color:#fff;border-radius:var(--r-g);padding:26px 30px 28px;margin-bottom:32px;
-  box-shadow:var(--sombra-g);animation:entra .32s var(--curva) both;
+  box-shadow:var(--sombra-g);
   position:relative;overflow:hidden;
 }
+/* Mesmo motivo do #main.entrando em section: o cartão escuro do topo é
+   refeito a cada render e re-animava a cada clique de ordenação. */
+#main.entrando .resumo{animation:entra .32s var(--curva) both}
 .resumo::before{
   content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(60% 140% at 100% 0%, rgba(24,135,200,.24) 0%, transparent 65%);
@@ -331,7 +334,13 @@ header .marca span{color:var(--menta)}
 main{max-width:1240px;margin:0 auto;padding:30px 22px 96px}
 
 /* ---------- seções ---------- */
-section{margin-bottom:40px;animation:entra .32s var(--curva) both}
+section{margin-bottom:40px}
+/* A animação de entrada só faz sentido na primeira pintura depois de
+   carregar os dados. Estava em toda section, e como cada ordenação de
+   coluna, clique de mês ou troca de aba refaz o #main inteiro, as sete
+   seções re-animavam juntas a cada clique: a página inteira piscava
+   para responder a um "ordenar por receita". */
+#main.entrando section{animation:entra .32s var(--curva) both}
 @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .cab{
   display:flex;align-items:baseline;gap:12px;margin-bottom:16px;
@@ -402,6 +411,10 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr{transition:background var(--rapido)}
 tbody tr:hover{background:var(--véu)}
 .d{text-align:right}
+/* Teto de altura das listas longas (Perdidos, Cadência). Só faz sentido
+   no desktop, onde a tabela é tabela; no mobile ela vira lista de cartões
+   e quem rola passa a ser a página (ver o bloco de 640px). */
+.rolo-limite{max-height:var(--limite,400px);overflow-y:auto}
 
 /* ---------- cabeçalho ordenável ---------- */
 th[data-sort]{cursor:pointer;user-select:none;transition:color var(--rapido)}
@@ -430,7 +443,9 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 .pill.ok{background:var(--alta-fundo);color:var(--alta)}
 .pill.no{background:var(--baixa-fundo);color:var(--baixa)}
 .pill.at{background:var(--azul-claro);color:var(--azul)}
-.abas{display:flex;gap:7px;margin-bottom:14px}
+/* flex-wrap porque as abas de ano do popup crescem uma por ano: hoje
+   cabem três, mas a lista só aumenta e ia espremer ou vazar. */
+.abas{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
 .abcGrid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
 @media(max-width:860px){ .abcGrid{grid-template-columns:1fr} }
 /* Sem align-items:start os dois cartões esticam pra mesma altura (o
@@ -698,6 +713,31 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
   .graf-rolo svg{width:auto;min-width:620px;height:auto}
   .graf-rolo svg rect[data-mes]{scroll-snap-align:start}
 
+  /* ---- gráfico do popup de cliente ----
+     Ele usava width:100% puro: com muitos meses na aba "Tudo", o SVG
+     encolhia junto com a tela e o texto virava poeira num celular
+     estreito. Agora segue o mesmo padrão dos outros gráficos, piso de
+     largura e rolagem lateral, com o piso proporcional ao número de
+     meses (a variável vem do JS). ---- */
+  .graf-cliente svg{min-width:var(--piso-cliente,620px)}
+
+  /* ---- respiro acima do botão de fechar do popup ----
+     .modal-cliente tem padding-top:44px no desktop para o nome não
+     encostar no "×". A regra genérica de .modal no mobile sobrescrevia
+     isso, e um nome de cliente comprido renderizava atrás do botão. ---- */
+  .modal-cliente{padding-top:46px}
+
+  /* ---- rolagem aninhada: fora ----
+     ABC (580px pela .abcGrid), Perdidos (400px) e Cadência (440px) tinham
+     teto de altura próprio. No desktop isso é uma tabela com scroll
+     interno, tudo bem. No mobile as três viram lista de cartões, e uma
+     lista de cartões dentro de uma caixa de 400px é duas rolagens
+     disputando o mesmo dedo: o polegar nunca sabe qual delas vai andar,
+     e a de dentro engole o gesto da página. Aqui as três crescem à
+     vontade e quem rola é sempre a página. */
+  .rolo-limite{max-height:none;overflow-y:visible}
+  .abcGrid .rolo,.abcGrid .painel-donut,.abcGrid .vazio{height:auto;overflow-y:visible}
+
   /* ---- estado de carregamento: no mobile, um pouco mais compacto ---- */
   .esqueleto{padding:4px 2px}
 }
@@ -808,7 +848,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
       A carga substitui os dados anteriores.
     </p>
     <div class="zona" id="zona">
-      Arraste o CSV ou <label for="arquivo" style="display:inline;text-transform:none;letter-spacing:0;font-size:14px;color:var(--azul);cursor:pointer;text-decoration:underline">escolha um arquivo</label>
+      Arraste o CSV ou <label for="arquivo" id="rotArquivo" tabindex="0" role="button" style="display:inline;text-transform:none;letter-spacing:0;font-size:14px;color:var(--azul);cursor:pointer;text-decoration:underline">escolha um arquivo</label>
       <input id="arquivo" type="file" accept=".csv,.txt" hidden>
     </div>
     <div class="log" id="log" style="display:none"></div>
@@ -836,6 +876,11 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
    Tudo que muda com regra de negócio mora aqui. Editar
    este bloco não exige entender o resto do arquivo.
    ========================================================== */
+// Carimbo da versão publicada. Sem isso não dá para saber, olhando a
+// tela, qual HTML está no ar depois de um deploy: some no rodapé da
+// barra e no console, e é a primeira pergunta de qualquer suporte.
+const VERSAO = '2026.07.25';
+
 const CONFIG = {
   SUPABASE_URL : 'https://limkqsbhblbctpajzjdz.supabase.co',
   SUPABASE_ANON: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpbWtxc2JoYmxiY3RwYWp6amR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDE3NjMsImV4cCI6MjEwMDM3Nzc2M30.MI-6648LdocP-lX7gqIO3WiMnHp7QoJYe65l3uE-n7o',
@@ -860,7 +905,15 @@ const CONFIG = {
   // aqui, e só aqui, se um dia precisar mudar de novo.
   META_CRESCIMENTO  : 0.25, // 25% de crescimento sobre o mesmo período do ano anterior
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
-  ATRASO_MINIMO     : 21    // dias de atraso para entrar na worklist
+  ATRASO_MINIMO     : 21,   // dias de atraso para entrar na worklist
+
+  // Linha de NF com valor zero (bonificação, brinde, amostra). Contando,
+  // ela entra no banco e passa a valer como CONTATO: conta na cadência,
+  // na carteira e na data de última compra. Não conta como receita em
+  // lugar nenhum, porque soma zero. A curva ABC continua sendo só de
+  // quem faturou (ver secABC) — Pareto de valor zero não é Pareto.
+  // Virar isso para false volta ao comportamento antigo, de descartar.
+  CONTAR_BONIFICACAO: true
 };
 
 /* ==========================================================
@@ -897,6 +950,14 @@ let PENDENTE = null;       // linhas parseadas aguardando gravação
 let PETMED_ON = true;
 let PODE_IMPORTAR = false;  // definido no login, a partir da tabela perfis
 let FILTRO_MES = null;      // {ano, mes} quando uma coluna do gráfico está selecionada
+// As abas da seção Cadência sempre incluem o ATRASO_MINIMO, então mudar
+// esse número no CONFIG não deixa mais o estado inicial órfão. Antes a
+// lista era [21,30,45] escrita à mão lá embaixo: trocar ATRASO_MINIMO
+// para 25 dava um corte inicial que não correspondia a nenhuma aba, e
+// nenhuma delas acendia.
+const CORTES_CADENCIA = [...new Set([CONFIG.ATRASO_MINIMO, 30, 45])].sort((a,b) => a-b);
+let DADOS_VERSAO = 0;                       // muda a cada carga; invalida o cache de base()
+let PRIMEIRA_PINTURA = true;                // ver #main.entrando no CSS
 let CORTE_CADENCIA = CONFIG.ATRASO_MINIMO; // aba de dias escolhida em Cadência, sobrevive a qualquer re-render
 
 // Estado de ordenação por clique de cabeçalho, um por tabela. col=null
@@ -935,6 +996,7 @@ async function entrar(){
     });
     if(error){ $('#erroLogin').textContent = 'E-mail ou senha não conferem.'; return; }
   }catch(err){
+    console.error('[BI] entrar():', err);
     $('#erroLogin').textContent = 'Não deu para conectar. Confira sua internet e tente de novo.';
     return;
   }finally{
@@ -949,6 +1011,7 @@ $('#btnSair').onclick = async () => {
   location.reload();
 };
 
+console.info(`[BI] Calmart BI Comercial v${VERSAO}`);
 sb.auth.getSession().then(({data}) => { if(data.session) abrir(); });
 
 async function abrir(){
@@ -967,9 +1030,26 @@ async function abrir(){
     $('#fabImportar').style.display = PODE_IMPORTAR ? '' : 'none';
     await carregar();
   }catch(err){
+    console.error('[BI] abrir():', err);
+    if(sessaoExpirada(err)) return voltarAoLogin();
     $('#main').innerHTML = `<div class="vazio"><h3>Não deu para carregar</h3>
       <p>Falha de conexão ao verificar sua permissão ou buscar os dados. Recarregue a página.</p></div>`;
   }
+}
+
+// O token do Supabase expira. Com a aba aberta a noite inteira, a
+// primeira leitura da manhã voltava um erro cru de JWT dentro do cartão
+// "Não deu para ler o banco", e o usuário recarregava a página sem
+// entender. Reconhecer o caso e mandar para o login resolve em um clique.
+function sessaoExpirada(erro){
+  const m = `${erro?.message || ''} ${erro?.code || ''} ${erro?.status || ''}`;
+  return /jwt|token|expired|refresh|not authenticated|401|403/i.test(m);
+}
+
+function voltarAoLogin(motivo){
+  $('#app').style.display   = 'none';
+  $('#login').style.display = '';
+  $('#erroLogin').textContent = motivo || 'Sua sessão expirou. Entre de novo.';
 }
 
 /* ==========================================================
@@ -990,20 +1070,55 @@ async function carregar(){
     </div>
   </div>`;
   try{
+    // Descobre qual carga está publicada. Se a coluna 'ativa' ainda não
+    // existir no banco (deploy do HTML antes da migração), cai no
+    // comportamento antigo de ler tudo, em vez de mostrar erro.
+    let idAtiva = null;
+    const { data:imps, error:eImp } = await sb.from('importacoes')
+      .select('id').eq('ativa', true).order('id', { ascending:false }).limit(1);
+    if(!eImp && imps?.length) idAtiva = imps[0].id;
+
     const linhas = []; const passo = 1000;
     for(let de = 0; ; de += passo){
-      const { data, error } = await sb.from('nf_itens')
-        .select('nf,emissao,cliente_cod,cliente_nome,produto_cod,produto_desc,qtd,valor,cidade,uf,representante')
+      let q = sb.from('nf_itens')
+        // Só o que o dashboard realmente lê. produto_cod, produto_desc,
+        // qtd, cidade, uf e representante vinham no payload de TODA
+        // abertura de página, para todo usuário, e nenhuma linha do
+        // código encostava neles: produto_desc é o campo mais longo da
+        // tabela e sozinho pesava mais que vários outros somados.
+        // Continuam gravados no banco; quando a página de Produtos da v2
+        // existir, é só devolver os nomes a esta lista.
+        .select('nf,emissao,cliente_cod,cliente_nome,valor')
+        // Ordenar só por emissao não basta: milhares de linhas dividem a
+        // mesma data, e o Postgres não garante a mesma ordem dentro do
+        // empate entre uma consulta e a seguinte. Como cada página é uma
+        // consulta nova, a fronteira caía no meio de um empate e podia
+        // repetir ou pular linhas, mudando o faturamento em silêncio.
+        // O id como segunda chave torna a ordem total e a página estável.
         .order('emissao', { ascending:true })
-        .range(de, de + passo - 1);
-      if(error){ $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${error.message}</p></div>`; return; }
+        .order('id', { ascending:true });
+      if(idAtiva !== null) q = q.eq('importacao_id', idAtiva);
+      const { data, error } = await q.range(de, de + passo - 1);
+      if(error){
+        console.error('[BI] falha ao ler nf_itens:', error);
+        if(sessaoExpirada(error)) return voltarAoLogin();
+        $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${esc(error.message)}</p></div>`;
+        return;
+      }
       linhas.push(...data);
       if(data.length < passo) break;
     }
-    DADOS = linhas.map(r => ({...r, dt:new Date(r.emissao + 'T00:00:00Z'), valor:+r.valor, qtd:+r.qtd}));
+    DADOS = linhas.map(r => ({...r, dt:new Date(r.emissao + 'T00:00:00Z'), valor:+r.valor}));
+    DADOS_VERSAO++;
+    // Carga nova é conteúdo novo: vale a animação de entrada de novo.
+    // O que ficou proibido é reanimar a cada clique de ordenação.
+    PRIMEIRA_PINTURA = true;
     montarAnos();
     render();
   }catch(err){
+    // console.error em todo catch: sem isso, um problema em produção não
+    // deixa rastro nenhum e não há como diagnosticar pelo relato.
+    console.error('[BI] carregar():', err);
     $('#main').innerHTML = '<div class="vazio"><h3>Não deu para ler o banco</h3><p>Falha de conexão. Recarregue a página e tente de novo.</p></div>';
   }
 }
@@ -1021,17 +1136,58 @@ const ehPetmed = n => CONFIG.PETMED.some(x => (n||'').toUpperCase().includes(x))
 
 // Aplica grupo econômico e o filtro PETMED. Devolve linhas com
 // clienteKey/clienteNome já consolidados.
+// base() percorre e reconstrói a base inteira, e era chamada de novo a
+// cada render — ou seja, a cada ordenação de coluna, clique de mês, aba
+// de cadência ou abertura de popup. O resultado só depende de DADOS e do
+// botão PETMED, então vale guardar: as interações passam a mexer só no
+// desenho, não em recalcular dezenas de milhares de linhas.
+let BASE_CACHE = null, BASE_CACHE_CHAVE = null;
+
 function base(){
-  return DADOS
+  const chave = DADOS_VERSAO + '|' + PETMED_ON;
+  if(BASE_CACHE && BASE_CACHE_CHAVE === chave) return BASE_CACHE;
+  BASE_CACHE = DADOS
     .filter(r => PETMED_ON || !ehPetmed(r.cliente_nome))
     .map(r => {
       const g = ehGrupo(r.cliente_nome);
       return {...r, ck: g || r.cliente_cod, cn: g || r.cliente_nome};
     });
+  BASE_CACHE_CHAVE = chave;
+  return BASE_CACHE;
 }
+
+// Nome de cliente vem do Senior e vai parar dentro de innerHTML e de
+// atributos. Uma razão social com aspas duplas quebrava o data-nome e
+// engolia o resto da linha; & e < quebrariam a renderização.
+const ESCAPES = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESCAPES[c]);
 
 const dia = 86400000;
 const diasEntre = (a,b) => Math.round((b - a)/dia);
+
+// Math.max(...array) passa cada item como um argumento de função, e todo
+// navegador tem teto pra isso (dezenas de milhares, varia por engine).
+// nf_itens é uma linha por item de nota, então a base cruza esse teto
+// sozinha com o tempo e o dashboard morreria com RangeError, tela em
+// branco e nenhuma mensagem. Um laço não tem esse limite.
+function ultimaData(linhas){
+  let t = 0;
+  for(const r of linhas){ const v = +r.dt; if(v > t) t = v; }
+  return new Date(t);
+}
+
+// Último mês (0-11) com faturamento no ano pedido. Devolve -1 quando o
+// ano não tem nenhuma venda, em vez do -Infinity que o Math.max de array
+// vazio produzia (e que virava "até undefined" na tela).
+function ultimoMesComVenda(linhas, ano){
+  let m = -1;
+  for(const r of linhas){
+    if(r.dt.getUTCFullYear() !== ano) continue;
+    const i = r.dt.getUTCMonth();
+    if(i > m) m = i;
+  }
+  return m;
+}
 function mediana(v){
   const s=[...v].sort((a,b)=>a-b), m=s.length>>1;
   return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
@@ -1056,12 +1212,39 @@ function corteHistorico(B, hoje, filtroMes){
 function montarAnos(){
   const anos = [...new Set(DADOS.map(r => r.dt.getUTCFullYear()))].sort((a,b)=>b-a);
   const s = $('#anoBase');
-  if(s.options.length && anos.includes(+s.value)) return;
+  const escolhido = +s.value;
+
+  // A condição antiga ("o valor atual ainda existe? então não mexe")
+  // fazia um ano novo nunca aparecer: na primeira nota de um ano
+  // seguinte, o ano estava na base mas ficava fora da lista até alguém
+  // recarregar a página. Agora compara a lista inteira, não só o valor
+  // selecionado, e só reconstrói quando o conjunto de fato mudou.
+  const iguais = s.options.length === anos.length &&
+                 [...s.options].every((o,i) => +o.value === anos[i]);
+  if(iguais) return;
+
   s.innerHTML = '';
   anos.forEach(a => s.add(new Option(a, a)));
+  if(anos.includes(escolhido)) s.value = String(escolhido);
 }
 
-['#anoBase','#dias'].forEach(id => $(id).addEventListener('input', render));
+// O min="30" do HTML não vale nada para o JS, que lê o campo direto. No
+// instante em que o campo fica vazio (para digitar outro número) o valor
+// lido era 0, e a carteira inteira aparecia como perdida.
+function janelaInativo(){
+  const bruto = $('#dias').value.trim();
+  if(bruto === '') return 120;                 // campo vazio: volta ao padrão
+  const v = Math.round(+bruto);
+  if(!Number.isFinite(v)) return 120;
+  // Encosta no limite mais próximo em vez de saltar para 120: quem
+  // digitou 25 queria pouco, não queria o padrão de volta.
+  return Math.min(Math.max(v, 30), 720);
+}
+
+// 'change' e não 'input': com 'input' o render inteiro disparava a cada
+// tecla digitada, refazendo os sete blocos sobre a base toda.
+$('#anoBase').addEventListener('change', render);
+$('#dias').addEventListener('change', () => { $('#dias').value = janelaInativo(); render(); });
 $('#btnPetmed').onclick = function(){
   PETMED_ON = !PETMED_ON;
   this.textContent = PETMED_ON ? 'Incluída' : 'Excluída';
@@ -1093,8 +1276,11 @@ function thOrd(texto, chave, tabela, opcoes={}){
   const ativo = estado.col === chave;
   const dirTxt = ativo ? (estado.dir === 'asc' ? 'ascending' : 'descending') : 'none';
   const seta = ativo ? (estado.dir === 'asc' ? '▲' : '▼') : '⇅';
+  // Sem role="button": ele sobrescrevia o papel de columnheader e o
+  // leitor de tela deixava de anunciar a coluna e o aria-sort. tabindex
+  // e o handler de Enter já dão o acesso por teclado.
   return `<th data-sort="${chave}" data-tabela="${tabela}" data-tipo="${opcoes.tipo||'numero'}"
-    aria-sort="${dirTxt}" tabindex="0" role="button"${opcoes.alinhar==='d' ? ' class="d"' : ''}
+    aria-sort="${dirTxt}" tabindex="0" title="Ordenar por ${esc(texto)}"${opcoes.alinhar==='d' ? ' class="d"' : ''}
     >${texto}<span class="seta">${seta}</span></th>`;
 }
 
@@ -1138,17 +1324,24 @@ $('#main').addEventListener('keydown', e => {
 
 /* ==========================================================
    6.3c popup de desempenho mensal do cliente (clique na linha da ABC)
-   Sempre desde janeiro/2025 até o mês mais recente da base, ignorando
+   Sempre da primeira nota da base até o mês mais recente dela, ignorando
    qualquer mês em foco — é uma foto do histórico inteiro daquele
    cliente, igual "última compra"/"situação" já fazem na própria ABC.
    ========================================================== */
-const ANO_INICIO_HISTORICO = 2025, MES_INICIO_HISTORICO = 0; // janeiro
-
 function serieMensalCliente(ck){
   const B = base();
   if(!B.length) return [];
-  const hoje = new Date(Math.max(...B.map(r => r.dt)));
+  const hoje = ultimaData(B);
   const anoFim = hoje.getUTCFullYear(), mesFim = hoje.getUTCMonth();
+
+  // O início era a constante 2025. Qualquer nota anterior a isso ficava
+  // de fora em silêncio: a aba "Tudo" mostrava menos que tudo, o total
+  // abreviado do canto vinha errado e nenhum aviso aparecia. Derivar da
+  // própria base resolve isso para sempre, inclusive se um dia entrar
+  // histórico mais antigo numa importação.
+  let ini = +hoje;
+  for(const r of B){ const v = +r.dt; if(v < ini) ini = v; }
+  const dIni = new Date(ini);
 
   const somaPorMes = {};
   B.forEach(r => { if(r.ck !== ck) return;
@@ -1157,7 +1350,7 @@ function serieMensalCliente(ck){
   });
 
   const serie = [];
-  let ano = ANO_INICIO_HISTORICO, mes = MES_INICIO_HISTORICO;
+  let ano = dIni.getUTCFullYear(), mes = dIni.getUTCMonth();
   while(ano < anoFim || (ano === anoFim && mes <= mesFim)){
     serie.push({ ano, mes, valor: somaPorMes[ano+'-'+mes] || 0 });
     mes++; if(mes > 11){ mes = 0; ano++; }
@@ -1208,7 +1401,7 @@ function abrevBRL(v){
   return sinal + Math.round(av);
 }
 
-let CLIENTE_SERIE = [];        // série completa (jan/2025 → hoje) do cliente aberto no popup
+let CLIENTE_SERIE = [];        // série completa (início da base → hoje) do cliente aberto no popup
 let CLIENTE_ANO_FILTRO = 'tudo'; // 'tudo' ou um ano específico — reseta a cada abertura
 
 function abrirClienteModal(ck, nome){
@@ -1216,7 +1409,7 @@ function abrirClienteModal(ck, nome){
   CLIENTE_ANO_FILTRO = 'tudo';
   $('#clienteNome').textContent = nome;
   pintarClienteModal();
-  $('#fundoCliente').classList.add('on');
+  abrirModal($('#fundoCliente'));
 }
 
 function pintarClienteModal(){
@@ -1247,7 +1440,7 @@ function pintarClienteModal(){
         <div class="cliente-total-rot">acumulado ${CLIENTE_ANO_FILTRO==='tudo' ? 'no período' : 'em '+CLIENTE_ANO_FILTRO}</div>
       </div>
     </div>
-    ${linhaCliente(serie)}`;
+    <div class="graf-rolo graf-cliente" style="--piso-cliente:${Math.max(620, serie.length*46)}px">${linhaCliente(serie)}</div>`;
 }
 
 $('#main').addEventListener('click', e => {
@@ -1264,14 +1457,25 @@ $('#main').addEventListener('keydown', e => {
 $('#clienteGraficoZona').addEventListener('click', e => {
   const btn = e.target.closest('[data-ano-cliente]');
   if(!btn) return;
-  CLIENTE_ANO_FILTRO = btn.dataset.anoCliente === 'tudo' ? 'tudo' : +btn.dataset.anoCliente;
+  const alvo = btn.dataset.anoCliente;
+  CLIENTE_ANO_FILTRO = alvo === 'tudo' ? 'tudo' : +alvo;
   pintarClienteModal();
+  // O innerHTML refeito destrói o botão que estava com o foco. Sem
+  // devolver, o foco cai no body e a armadilha de Tab do modal fica sem
+  // âncora, deixando o Tab escapar para a página atrás do overlay.
+  $(`#clienteGraficoZona [data-ano-cliente="${alvo}"]`)?.focus();
 });
 
-$('#btnFecharCliente').onclick = () => $('#fundoCliente').classList.remove('on');
-$('#fundoCliente').onclick = e => { if(e.target === $('#fundoCliente')) $('#fundoCliente').classList.remove('on'); };
+$('#btnFecharCliente').onclick = () => fecharModal($('#fundoCliente'));
+$('#fundoCliente').onclick = e => { if(e.target === $('#fundoCliente')) fecharModal($('#fundoCliente')); };
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape') $('#fundoCliente').classList.remove('on');
+  if(e.key !== 'Escape') return;
+  // Fecha só o que está por cima. Antes o Esc mexia sempre no popup de
+  // cliente, inclusive quando quem estava na frente era o modal de
+  // importação — que, por sua vez, não fechava com Esc de jeito nenhum.
+  const cliente = $('#fundoCliente'), imp = $('#fundo');
+  if(cliente.classList.contains('on')){ fecharModal(cliente); return; }
+  fecharModal(imp);
 });
 
 function atualizarChipFiltro(){
@@ -1320,6 +1524,47 @@ if(navSecoes){
     document.getElementById(b.dataset.alvo)?.scrollIntoView?.({ behavior:'smooth', block:'start' });
   });
 }
+/* ---------- foco em modais ----------
+   Os dois modais abriam sem levar o foco junto: com teclado ou leitor de
+   tela, o Tab continuava passeando pela página atrás do overlay, e ao
+   fechar o foco não voltava para a linha que tinha sido clicada. */
+let FOCO_ANTERIOR = null;
+
+function focaveis(cx){
+  return [...cx.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter(e => !e.disabled && e.offsetParent !== null);
+}
+
+function abrirModal(cx){
+  FOCO_ANTERIOR = document.activeElement;
+  cx.classList.add('on');
+  const f = focaveis(cx);
+  if(f.length) f[0].focus();
+}
+
+function fecharModal(cx){
+  if(!cx.classList.contains('on')) return;
+  cx.classList.remove('on');
+  if(FOCO_ANTERIOR?.focus) FOCO_ANTERIOR.focus();
+  FOCO_ANTERIOR = null;
+}
+
+// Tab circula dentro do modal aberto em vez de escapar para a página.
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Tab') return;
+  const cx = $('#fundoCliente').classList.contains('on') ? $('#fundoCliente')
+           : $('#fundo').classList.contains('on')        ? $('#fundo') : null;
+  if(!cx) return;
+  const f = focaveis(cx);
+  if(!f.length) return;
+  const pri = f[0], ult = f[f.length-1];
+  // Foco fora do modal (o conteúdo foi refeito, por exemplo): traz de
+  // volta em vez de deixar o Tab vazar para a página de baixo.
+  if(!cx.contains(document.activeElement)){ e.preventDefault(); pri.focus(); return; }
+  if(e.shiftKey && document.activeElement === pri){ e.preventDefault(); ult.focus(); }
+  else if(!e.shiftKey && document.activeElement === ult){ e.preventDefault(); pri.focus(); }
+});
+
 function iniciarNavSecoes(){
   if(!navSecoes || typeof IntersectionObserver === 'undefined') return;
   observadorSecoes?.disconnect();
@@ -1338,10 +1583,50 @@ function iniciarNavSecoes(){
     });
   }, { rootMargin:'-112px 0px -70% 0px', threshold:0 });
   alvos.forEach(a => observadorSecoes.observe(a));
+  corrigirFimDaPagina();
 }
 
+// A faixa de observação é o topo da tela (rootMargin -70% embaixo). Uma
+// seção curta no fim da página pode nunca alcançar essa faixa, porque a
+// rolagem acaba antes: a pílula ficava presa na seção anterior e nunca
+// acendia a última. No fim da página, a última seção é a resposta certa
+// por definição, então é ela que acende.
+function corrigirFimDaPagina(){
+  if(!navSecoes) return;
+  const fim = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
+  if(!fim) return;
+  const pilulas = [...navSecoes.querySelectorAll('.pilula')];
+  const ultima = pilulas[pilulas.length-1];
+  if(!ultima || ultima.classList.contains('on')) return;
+  pilulas.forEach(b => b.classList.toggle('on', b === ultima));
+  ultima.scrollIntoView?.({ behavior:'smooth', inline:'center', block:'nearest' });
+}
+// scrollHeight é leitura de layout: chamada a cada evento de scroll ela
+// força reflow e engasga a rolagem no celular. Uma vez por quadro basta.
+let scrollAgendado = false;
+window.addEventListener('scroll', () => {
+  if(scrollAgendado) return;
+  scrollAgendado = true;
+  requestAnimationFrame(() => { scrollAgendado = false; corrigirFimDaPagina(); });
+}, { passive:true });
+
 /* ---------- FAB de importar (mobile): mesmo modal do botão do header ---------- */
-$('#fabImportar').onclick = () => { fundo.classList.add('on'); };
+// Reabrir o modal tem que devolver estado limpo. O botão Gravar voltava
+// habilitado pelo finally do gravar anterior (clicar nele não fazia nada,
+// mas parecia que faria), e o log da carga passada continuava na tela
+// como se descrevesse o arquivo desta vez.
+function abrirImportacao(){
+  PENDENTE = null;
+  // textContent vazio não bastava: diz() liga o display, e a caixa
+  // continuava aberta e vazia, com borda, na próxima abertura.
+  $('#log').textContent = ''; $('#log').style.display = 'none';
+  $('#btnGravar').disabled = true;
+  $('#arquivo').value = '';
+  $('#zona').classList.remove('dentro');
+  abrirModal($('#fundo'));
+}
+
+$('#fabImportar').onclick = abrirImportacao;
 
 
 // Compara a última NF da base com a data real de hoje (relógio do
@@ -1365,7 +1650,7 @@ function render(){
           <h3>Nenhum dado no banco</h3>
           <p>Extraia o RFNF613 no Senior, salve como CSV e use o botão Importar CSV no topo.
              O dashboard monta tudo em seguida.</p>
-          <button class="btn" onclick="document.getElementById('fundo').classList.add('on')">Importar CSV</button>
+          <button class="btn" onclick="abrirImportacao()">Importar CSV</button>
         </div>`
       : `<div class="vazio">
           <h3>Nenhum dado no banco</h3>
@@ -1376,11 +1661,32 @@ function render(){
     return;
   }
 
-  const B    = base();
+  // Só a primeira pintura depois do carregamento anima (ver CSS de
+  // #main.entrando). Da segunda em diante, o conteúdo troca sem piscar.
+  m.classList.toggle('entrando', PRIMEIRA_PINTURA);
+  PRIMEIRA_PINTURA = false;
+
+  const B = base();
+
+  // A base tem dados, mas o filtro atual pode não deixar nada de pé (o
+  // caso real: um ano em que só PETMED faturou, com PETMED excluída).
+  // Sem essa guarda, "hoje" virava Invalid Date e a tela inteira
+  // renderizava NaN sem explicar nada.
+  if(!B.length){
+    atualizarChipFiltro();
+    m.innerHTML = `<div class="vazio">
+      <h3>Nada sobra com esse recorte</h3>
+      <p>Há dados no banco, mas nenhum passa pelo filtro atual.
+         Se o cliente PETMED está excluído, volte a incluí-lo na barra de cima.</p>
+    </div>`;
+    $('#ref').textContent = '';
+    return;
+  }
+
   const ano  = +$('#anoBase').value;
   const meta = CONFIG.META_CRESCIMENTO;
-  const jan  = +$('#dias').value;
-  const hoje = new Date(Math.max(...B.map(r => r.dt)));   // referência = última NF da base
+  const jan  = janelaInativo();
+  const hoje = ultimaData(B);   // referência = última NF da base
 
   // Se o mês selecionado for de um ano diferente do ano-base atual,
   // o filtro perdeu o sentido (o usuário trocou o ano no meio do caminho).
@@ -1388,7 +1694,8 @@ function render(){
   atualizarChipFiltro();
 
   $('#ref').innerHTML = seloAtualizacao(hoje) +
-    `<br>referência ${dbr(hoje)}<br>${mil(B.length)} itens · ${mil(new Set(B.map(r=>r.nf+r.emissao)).size)} NFs`;
+    `<br>referência ${dbr(hoje)}<br>${mil(B.length)} itens · ${mil(new Set(B.map(r=>r.nf+r.emissao)).size)} NFs` +
+    `<br><span style="opacity:.6">v${VERSAO}</span>`;
 
   m.innerHTML = '';
   m.appendChild(secResumo(B, ano, meta, jan, hoje));
@@ -1515,7 +1822,16 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   const temMeta = temAno && metaPeriodo > 0;
   const falta = metaPeriodo - accA;
   const pct = temMeta ? accA/metaPeriodo*100 : 0;
-  const mesesPassados = ultimo+1, mesesRestantes = 12 - mesesPassados;
+  // O card do mês conta o tempo em dias decorridos; o do ano contava
+  // "ultimo+1" meses cheios, tratando um 24 de julho como julho inteiro
+  // já vencido. Isso subestimava o ritmo atual e inflava o necessário,
+  // e os dois cards do resumo podiam exibir selos opostos lado a lado
+  // sem que nada estivesse errado no cálculo, só na convenção. Agora os
+  // dois medem o tempo do mesmo jeito.
+  const diasDoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
+  const mesEmAndamento = (ano === hoje.getUTCFullYear() && ultimo === hoje.getUTCMonth());
+  const fracaoCorrente = mesEmAndamento ? hoje.getUTCDate()/diasDoMes : 1;
+  const mesesPassados = ultimo + fracaoCorrente, mesesRestantes = 12 - mesesPassados;
   const ritmoAtual = mesesPassados ? accA/mesesPassados : 0;
   let ritmoNecessario = null, acimaDoRitmo = null;
   if(temMeta){
@@ -1569,8 +1885,9 @@ function secResumo(B, ano, meta, jan, hoje){
     if(y === ano)   A[i] += r.valor;
     if(y === ano-1) P[i] += r.valor;
   });
-  const temAno = B.some(r => r.dt.getUTCFullYear() === ano);
-  const ultimo = temAno ? Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth())) : 0;
+  const ultimoMes = ultimoMesComVenda(B, ano);
+  const temAno = ultimoMes >= 0;
+  const ultimo = temAno ? ultimoMes : 0;
 
   // 1. meta anual — 2. meta do mês: os dois sempre visíveis, lado a lado.
   grade.appendChild(blocoDaVista(vistaMeta('ano', A, P, ano, meta, temAno, ultimo, hoje)));
@@ -1592,7 +1909,11 @@ function secResumo(B, ano, meta, jan, hoje){
     const gaps = ds.slice(1).map((d,i) => diasEntre(ds[i], d));
     const ritmo = Math.round(mediana(gaps));
     const semComprar = diasEntre(ds[ds.length-1], hoje);
-    if(semComprar - ritmo >= CONFIG.ATRASO_MINIMO){ atrasados++; r12Atrasados += c.r12; }
+    // Mesmo corte que a seção Cadência lá embaixo (CORTE_CADENCIA, a aba
+    // que o usuário escolhe). Antes o topo era fixo em ATRASO_MINIMO: com
+    // a aba em 45 dias, o cartão dizia 12 clientes e a tabela logo abaixo
+    // mostrava 4, na mesma tela, sem nada explicando a diferença.
+    if(semComprar - ritmo >= CORTE_CADENCIA){ atrasados++; r12Atrasados += c.r12; }
   });
 
   const ultCompra = {};
@@ -1603,7 +1924,7 @@ function secResumo(B, ano, meta, jan, hoje){
   grade.appendChild(blocoDuplo(
     {
       status: atrasados > 0 ? 'atencao' : 'alta',
-      label: 'Cadência · na hora de ligar',
+      label: `Cadência · atraso de ${CORTE_CADENCIA} dias ou mais`,
       valor: String(atrasados), unidade: atrasados===1?'cliente':'clientes',
       contexto: atrasados > 0 ? `${brl(r12Atrasados)} em receita de 12 meses` : 'Ninguém atrasado agora'
     },
@@ -1631,7 +1952,12 @@ function secFaturamento(B, ano, meta, filtroMes){
     if(y === ano)   A[i] += r.valor;
     if(y === ano-1) P[i] += r.valor;
   });
-  const ultimo = Math.max(...B.filter(r=>r.dt.getUTCFullYear()===ano).map(r=>r.dt.getUTCMonth()));
+  // Antes: Math.max de array vazio devolvia -Infinity quando o ano em
+  // tela não tinha nenhuma venda. Isso virava "até undefined" no KPI e
+  // zerava o acumulado por slice(0, -Infinity), sem erro nenhum no console.
+  const ultimoMes = ultimoMesComVenda(B, ano);
+  const temAno = ultimoMes >= 0;
+  const ultimo = temAno ? ultimoMes : 0;
 
   const g = el('div','grade');
   if(noMes){
@@ -1641,15 +1967,23 @@ function secFaturamento(B, ano, meta, filtroMes){
     g.appendChild(kpi(`Faturamento em ${MES[mi]}/${ano}`, brl(A[mi]), 'no mês'));
     g.appendChild(kpi(`Mesmo mês em ${ano-1}`, brl(P[mi]), MES[mi]));
     g.appendChild(kpi('Variação sobre o mesmo mês', pct(dif), '', dif));
-    g.appendChild(kpi('Meta do mês', brl(metaMes), A[mi] >= metaMes ? 'atingida' : 'faltam ' + brl(metaMes-A[mi])));
+    // Sem faturamento no mesmo mês do ano anterior, a meta calculada é
+    // R$ 0,00 e qualquer venda "atinge" ela. O topo já tratava isso; esta
+    // seção dizia "atingida" com meta zerada.
+    g.appendChild(P[mi] > 0
+      ? kpi('Meta do mês', brl(metaMes), A[mi] >= metaMes ? 'atingida' : 'faltam ' + brl(metaMes-A[mi]))
+      : kpi('Meta do mês', 'sem base', `${MES[mi]}/${ano-1} não teve faturamento`));
   } else {
     const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
     const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
     const dif  = accP ? (accA/accP - 1)*100 : 0;
-    g.appendChild(kpi(`Acumulado ${ano}`, brl(accA), `até ${MES[ultimo]}`));
+    const metaAcc = accP*(1+meta);
+    g.appendChild(kpi(`Acumulado ${ano}`, brl(accA), temAno ? `até ${MES[ultimo]}` : `sem faturamento em ${ano}`));
     g.appendChild(kpi(`Acumulado ${ano-1}`, brl(accP), 'mesmos meses'));
     g.appendChild(kpi('Variação sobre o ano anterior', pct(dif), 'acumulado', dif));
-    g.appendChild(kpi('Meta do acumulado', brl(accP*(1+meta)), accA >= accP*(1+meta) ? 'atingida' : 'faltam ' + brl(accP*(1+meta)-accA)));
+    g.appendChild(accP > 0
+      ? kpi('Meta do acumulado', brl(metaAcc), accA >= metaAcc ? 'atingida' : 'faltam ' + brl(metaAcc-accA))
+      : kpi('Meta do acumulado', 'sem base', `${ano-1} não tem faturamento na base`));
   }
   s.appendChild(g);
 
@@ -1678,7 +2012,15 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
   for(let i=0;i<12;i++){
     const x = e + i*lg, w = lg*0.30;
     const ativo = !!(filtroMes && filtroMes.ano===ano && filtroMes.mes===i);
-    if(P[i]>0) g += `<rect x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
+    // Faixa invisível cobrindo a coluna inteira, do topo até o rótulo do
+    // mês. Antes só a barra azul respondia ao clique: um alvo de ~26px
+    // de largura, e o nome do mês logo abaixo dela não fazia nada, o que
+    // parece defeito. Vem antes das barras para ficar por baixo delas.
+    if(A[i] > 0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x}" y="${t}" width="${lg}" height="${H-t-6}" fill="transparent" pointer-events="all" style="cursor:pointer"/>`;
+    // A barra do ano anterior fica por cima da faixa invisível, então
+    // precisa do próprio data-mes: sem isso ela vira um buraco morto no
+    // meio de uma coluna que o usuário acabou de aprender que é clicável.
+    if(P[i]>0) g += `<rect${A[i]>0 ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
     if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
     if(M[i]>0) g += `<line x1="${x+lg*0.46}" y1="${y(M[i])}" x2="${x+lg*0.86}" y2="${y(M[i])}" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3"/>`;
     // Valor abreviado acima da barra que tem dado de verdade: o ano
@@ -1701,7 +2043,9 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
 function secCarteira(B, ano, hoje, jan, filtroMes){
   const { H, ref } = corteHistorico(B, hoje, filtroMes);
   const s = el('section'); s.id = 'sec-carteira';
-  cabecalho(s, 'Carteira de clientes', null, filtroMes ? `como estava em ${dbr(ref)}` : null);
+  const notaBonif = CONFIG.CONTAR_BONIFICACAO ? 'bonificação conta como contato' : null;
+  cabecalho(s, 'Carteira de clientes', null,
+    filtroMes ? `como estava em ${dbr(ref)}${notaBonif ? ' · '+notaBonif : ''}` : notaBonif);
 
   const ult = {}, pri = {};
   H.forEach(r => {
@@ -1717,7 +2061,13 @@ function secCarteira(B, ano, hoje, jan, filtroMes){
   g.appendChild(kpi('Carteira total', mil(todos.length), 'clientes com NF no histórico'));
   g.appendChild(kpi('Ativos', mil(ativos.length), `${todos.length ? (ativos.length/todos.length*100).toFixed(0) : 0}% da carteira`));
   g.appendChild(kpi('Perdidos', mil(perdidos), `${todos.length ? (perdidos/todos.length*100).toFixed(0) : 0}% da carteira`));
-  g.appendChild(kpi(`Novos em ${ano}`, mil(novos), 'primeira compra no ano'));
+  // "Novo" aqui significa "primeira compra dentro do que a base enxerga".
+  // No primeiro ano da base isso não distingue cliente novo de cliente
+  // antigo cujo histórico simplesmente não foi importado, então o rodapé
+  // do KPI avisa em vez de afirmar o que o dado não sustenta.
+  const primeiroAnoDaBase = B.length ? Math.min(...new Set(B.map(r => r.dt.getUTCFullYear()))) : ano;
+  g.appendChild(kpi(`Novos em ${ano}`, mil(novos),
+    ano === primeiroAnoDaBase ? 'primeira compra na base, que começa neste ano' : 'primeira compra no ano'));
   s.appendChild(g);
   return s;
 }
@@ -1738,7 +2088,15 @@ function secABC(B, ano, hoje, jan, filtroMes){
   const ultGeral = {};
   B.forEach(r => { if(!ultGeral[r.ck] || r.dt > ultGeral[r.ck]) ultGeral[r.ck] = r.dt; });
 
-  const lista = Object.entries(m).map(([k,v]) => ({k, ...v})).sort((a,b)=>b.fat-a.fat);
+  // Cliente que só recebeu bonificação no período tem fat = 0. Ele
+  // conta como contato na Carteira e na Cadência (é a decisão de
+  // negócio), mas não entra aqui: uma linha de R$ 0,00 num Pareto
+  // ocupa posição, engorda "clientes compradores" e não explica nada
+  // sobre concentração de receita, que é o que esta seção existe para
+  // mostrar.
+  const lista = Object.entries(m).map(([k,v]) => ({k, ...v}))
+    .filter(c => c.fat > 0)
+    .sort((a,b)=>b.fat-a.fat);
   const tot = lista.reduce((a,b)=>a+b.fat,0);
   let acc = 0;
   lista.forEach((c,i) => { acc += c.fat; c.acc = acc/tot*100; c.share = c.fat/tot*100;
@@ -1776,10 +2134,10 @@ function secABC(B, ano, hoje, jan, filtroMes){
     ${thOrd('NFs','nfs','abc',{alinhar:'d'})}
     ${thOrd('Última compra','ultima','abc')}${thOrd('Situação','situacao','abc')}</tr></thead><tbody>`;
   listaOrdenada.forEach(c => {
-    h += `<tr data-ck="${c.k}" data-nome="${c.nome}" tabindex="0" role="button" aria-label="Ver desempenho mensal de ${c.nome}">
+    h += `<tr data-ck="${esc(c.k)}" data-nome="${esc(c.nome)}" tabindex="0" aria-label="Ver desempenho mensal de ${esc(c.nome)}">
       <td class="num" data-rot="Posição">${c.pos}</td>
       <td data-rot="Classe"><span class="classe c${c.classe}">${c.classe}</span></td>
-      <td>${c.nome}</td>
+      <td>${esc(c.nome)}</td>
       <td class="d num" data-rot="Faturamento">${brl(c.fat)}</td>
       <td class="d num" data-rot="% do total">${c.share.toFixed(1).replace('.',',')}%</td>
       <td class="d num" data-rot="% acumulado">${c.acc.toFixed(1).replace('.',',')}%</td>
@@ -1841,7 +2199,7 @@ function donutABC(lista, tot, rotulo){
     const a0 = ang, a1 = ang + (f.share/100)*Math.PI*2;
     const grande = (a1-a0) > Math.PI ? 1 : 0;
     const [x0,y0]=pt(a0,rE), [x1,y1]=pt(a1,rE), [x2,y2]=pt(a1,rI), [x3,y3]=pt(a0,rI);
-    svg += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${rE},${rE} 0 ${grande} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${rI},${rI} 0 ${grande} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${f.cor}"><title>${f.nome}: ${p0(f.share)}</title></path>`;
+    svg += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${rE},${rE} 0 ${grande} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${rI},${rI} 0 ${grande} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${f.cor}"><title>${esc(f.nome)}: ${p0(f.share)}</title></path>`;
 
     if(f.share >= MOSTRA){
       const am = (a0+a1)/2;
@@ -1860,7 +2218,7 @@ function donutABC(lista, tot, rotulo){
   svg += rotulos + '</svg>';
 
   const legenda = fatias.map(f =>
-    `<span><i style="background:${f.cor}"></i>${f.nome} · <b style="font-family:var(--mono);font-weight:600;color:var(--tinta)">${abrevBRL(f.fat)}</b></span>`
+    `<span><i style="background:${f.cor}"></i>${esc(f.nome)} · <b style="font-family:var(--mono);font-weight:600;color:var(--tinta)">${abrevBRL(f.fat)}</b></span>`
   ).join('');
 
   card.innerHTML = svg
@@ -1912,7 +2270,10 @@ function secCompradores(B, ano, filtroMes){
   for(let i=0;i<12;i++){
     const x = e+i*lg, w = lg*0.30;
     const ativo = noMes && filtroMes.mes===i;
-    if(p.mes[i]) sv += `<rect x="${x+lg*0.16}" y="${y(p.mes[i])}" width="${w}" height="${H-b-y(p.mes[i])}" fill="#C2CCE2"/>`;
+    // Mesma faixa invisível de coluna inteira do gráfico de faturamento,
+    // para o clique e o rótulo do mês funcionarem igual nos dois.
+    if(a.mes[i]) sv += `<rect data-mes="${i}" data-ano="${ano}" x="${x}" y="${t}" width="${lg}" height="${H-t-6}" fill="transparent" pointer-events="all" style="cursor:pointer"/>`;
+    if(p.mes[i]) sv += `<rect${a.mes[i] ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(p.mes[i])}" width="${w}" height="${H-b-y(p.mes[i])}" fill="#C2CCE2"/>`;
     if(a.mes[i]) sv += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(a.mes[i])}" width="${w}" height="${H-b-y(a.mes[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>
       <text x="${x+lg*0.65}" y="${y(a.mes[i])-5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6689">${a.mes[i]}</text>`;
     sv += `<text x="${x+lg/2}" y="${H-10}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
@@ -1946,7 +2307,10 @@ function secPerdidos(B, hoje, jan, filtroMes){
   g.appendChild(kpi('Maior perda isolada', lista.length ? brl(lista[0].fat) : '—', lista.length ? lista[0].nome : ''));
   s.appendChild(g);
 
-  const r = el('div','rolo'); r.style.marginTop='12px'; r.style.maxHeight='400px'; r.style.overflowY='auto';
+  // Altura em classe, não em style inline: no mobile a tabela vira lista
+  // de cartões e essa caixa de rolagem precisa sumir (regra no bloco de
+  // 640px). Estilo inline não daria pra sobrescrever sem !important.
+  const r = el('div','rolo rolo-limite'); r.style.marginTop='12px';
   const listaOrdenada = ordenar(lista, 'perdidos', {
     cliente: c => c.nome.toLowerCase(),
     faturamento: c => c.fat,
@@ -1957,7 +2321,7 @@ function secPerdidos(B, hoje, jan, filtroMes){
     ${thOrd('Cliente','cliente','perdidos',{tipo:'texto'})}${thOrd('Faturamento histórico','faturamento','perdidos',{alinhar:'d'})}
     ${thOrd('Última compra','ultima','perdidos')}${thOrd('Dias sem comprar','dias','perdidos',{alinhar:'d'})}</tr></thead><tbody>`;
   listaOrdenada.forEach(c => {
-    h += `<tr><td>${c.nome}</td><td class="d num" data-rot="Faturamento histórico">${brl(c.fat)}</td>
+    h += `<tr><td>${esc(c.nome)}</td><td class="d num" data-rot="Faturamento histórico">${brl(c.fat)}</td>
       <td class="num" data-rot="Última compra">${dbr(c.ult)}</td>
       <td class="d num" data-rot="Dias sem comprar" style="color:var(--baixa)">${c.dias}</td></tr>`;
   });
@@ -1970,7 +2334,12 @@ function secPerdidos(B, hoje, jan, filtroMes){
 function secCadencia(B, hoje, filtroMes){
   const { H, ref } = corteHistorico(B, hoje, filtroMes);
   const s = el('section'); s.id = 'sec-cadencia';
-  cabecalho(s, 'Retomada por cadência', 'worklist', filtroMes ? `como estava em ${dbr(ref)}` : null);
+  // A regra muda o ritmo medido aqui: quem recebe brinde entre uma
+  // compra e outra passa a ter intervalo menor. Vale estar escrito na
+  // tela, não só no código.
+  const notaCad = CONFIG.CONTAR_BONIFICACAO ? 'bonificação conta como contato' : null;
+  cabecalho(s, 'Retomada por cadência', 'worklist',
+    filtroMes ? `como estava em ${dbr(ref)}${notaCad ? ' · '+notaCad : ''}` : notaCad);
 
   const m = {};
   H.forEach(r => {
@@ -1998,7 +2367,7 @@ function secCadencia(B, hoje, filtroMes){
   const pnKpi = el('div','grade');
   s.appendChild(pnKpi);
   s.appendChild(abas);
-  const rolo = el('div','rolo'); rolo.style.maxHeight='440px'; rolo.style.overflowY='auto';
+  const rolo = el('div','rolo rolo-limite'); rolo.style.setProperty('--limite','440px');
   s.appendChild(rolo);
 
   function pintar(){
@@ -2025,7 +2394,7 @@ function secCadencia(B, hoje, filtroMes){
       ${thOrd('Receita 12m','receita','cadencia',{alinhar:'d'})}</tr></thead><tbody>`;
     if(!filaOrdenada.length) h += `<tr><td colspan="7" style="color:var(--grafite);padding:24px;text-align:center">Ninguém atrasado nesse corte. Aumente o corte ou comemore.</td></tr>`;
     filaOrdenada.forEach(l => {
-      h += `<tr><td>${l.nome}</td>
+      h += `<tr><td>${esc(l.nome)}</td>
         <td class="d num" data-rot="Compra a cada">${l.ritmo} d</td>
         <td class="d num" data-rot="Compras">${l.n}</td>
         <td class="num" data-rot="Última compra">${dbr(l.ult)}</td>
@@ -2037,7 +2406,7 @@ function secCadencia(B, hoje, filtroMes){
     [...abas.children].forEach(b => b.classList.toggle('on', +b.dataset.v === CORTE_CADENCIA));
   }
 
-  [21,30,45].forEach(v => {
+  CORTES_CADENCIA.forEach(v => {
     const b = el('button','aba', `${v} dias ou mais`);
     b.dataset.v = v;
     // Muda o estado persistido e refaz o render inteiro — mesmo padrão
@@ -2057,25 +2426,54 @@ function secCadencia(B, hoje, filtroMes){
    abaixo reproduz exatamente esse formato.
    ========================================================== */
 const fundo = $('#fundo');
-$('#btnImportar').onclick = () => { fundo.classList.add('on'); };
-$('#btnFechar').onclick   = () => { fundo.classList.remove('on'); };
-fundo.onclick = e => { if(e.target === fundo) fundo.classList.remove('on'); };
+$('#btnImportar').onclick = abrirImportacao;
+// O input de arquivo é hidden (portanto não focável), e o label não era
+// alcançável por teclado. Sem isso, com o foco preso no modal, o Tab
+// circulava entre dois botões e nunca chegava em "escolher arquivo".
+$('#rotArquivo').addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#arquivo').click(); }
+});
+$('#btnFechar').onclick   = () => fecharModal(fundo);
+fundo.onclick = e => { if(e.target === fundo) fecharModal(fundo); };
 
 const zona = $('#zona');
 ['dragenter','dragover'].forEach(e => zona.addEventListener(e, ev => { ev.preventDefault(); zona.classList.add('dentro'); }));
 ['dragleave','drop'].forEach(e => zona.addEventListener(e, ev => { ev.preventDefault(); zona.classList.remove('dentro'); }));
-zona.addEventListener('drop', ev => { if(ev.dataTransfer.files[0]) ler(ev.dataTransfer.files[0]); });
+// O input tem accept=".csv,.txt"; o arraste não filtra nada. Sem
+// checar, arrastar um XLSX caía no parser e voltava um diagnóstico
+// críptico em vez de dizer o óbvio.
+zona.addEventListener('drop', ev => {
+  const f = ev.dataTransfer.files[0];
+  if(!f) return;
+  if(!/\.(csv|txt)$/i.test(f.name)){
+    diz(`"${f.name}" não é CSV. Abra o XLSX no Excel e use Salvar Como > CSV.`);
+    return;
+  }
+  ler(f);
+});
 $('#arquivo').onchange = ev => { if(ev.target.files[0]) ler(ev.target.files[0]); };
 
 function diz(txt){ const l = $('#log'); l.style.display='block'; l.textContent += txt + '\n'; l.scrollTop = l.scrollHeight; }
 
-// O Excel grava CSV ora em UTF-8, ora em Windows-1252, dependendo da
-// opção escolhida. Tenta UTF-8 e cai para 1252 se aparecer lixo.
+// O Excel grava CSV ora em UTF-8, ora em Windows-1252, ora em UTF-16
+// ("Texto Unicode"), dependendo da opção escolhida no Salvar Como.
+// A marca de ordem de bytes (BOM) no começo do arquivo diz qual é.
 function decodificar(buffer){
+  const b = new Uint8Array(buffer);
+
+  // UTF-16: sem tratar, o arquivo inteiro vira lixo e o parser não
+  // reconhece uma linha sequer.
+  if(b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(buffer);
+  if(b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(buffer);
+
   const utf = new TextDecoder('utf-8').decode(buffer);
   const lixo = (utf.match(/\uFFFD/g) || []).length;
-  if(lixo === 0) return utf;
-  return new TextDecoder('windows-1252').decode(buffer);
+  const txt = lixo === 0 ? utf : new TextDecoder('windows-1252').decode(buffer);
+
+  // "CSV UTF-8" do Excel grava BOM. O caractere invisível gruda na
+  // primeira célula do arquivo, então a primeira linha deixa de casar
+  // com /^\d+$/ e some da importação sem aviso nenhum.
+  return txt.charCodeAt(0) === 0xFEFF ? txt.slice(1) : txt;
 }
 
 function ler(file){
@@ -2107,10 +2505,39 @@ function ler(file){
       diz(`NFs: ${mil(new Set(linhas.map(l=>l.nf+l.emissao)).size)}`);
       diz(`Clientes: ${mil(new Set(linhas.map(l=>l.cliente_cod)).size)}`);
       diz(`Faturamento: ${brl(linhas.reduce((a,b)=>a+b.valor,0))}`);
+
+      if(DIAG.bonificacao)
+        diz(`Bonificação incluída: ${mil(DIAG.bonificacao)} linhas de valor zero contam como contato.`);
+      if(DIAG.rej.bonificacao)
+        diz(`Bonificação descartada: ${mil(DIAG.rej.bonificacao)} linhas de valor zero fora da base.`);
+      if(DIAG.rej.semValor)
+        diz(`Linhas com valor ilegível descartadas: ${mil(DIAG.rej.semValor)}`);
+      if(DIAG.rej.semData)
+        diz(`Linhas com data não reconhecida: ${mil(DIAG.rej.semData)}`);
+
+      // Sanidade de layout: qtd x preço unitário tem que fechar o valor.
+      // Denominador é só quem tem valor; bonificação fecha sempre e
+      // mascararia uma coluna fora do lugar.
+      const okPct = DIAG.comValor ? DIAG.conferem/DIAG.comValor*100 : 0;
+      if(okPct < 90){
+        diz('');
+        diz(`ATENÇÃO: só ${okPct.toFixed(1)}% das linhas fecham qtd x preço = valor.`);
+        diz('Isso costuma significar que as colunas do RFNF613 mudaram de');
+        diz('posição. Confira o faturamento acima contra o Senior antes de');
+        diz('gravar: o número pode estar sendo lido da coluna errada.');
+        diz('');
+      }
       diz('Confira os números acima. Se baterem com o Senior, grave.');
       $('#btnGravar').disabled = false;
-    }catch(err){ diz('Não deu para ler o arquivo: ' + err.message); }
+    }catch(err){
+      console.error('[BI] parse do CSV:', err);
+      diz('Não deu para ler o arquivo: ' + err.message);
+    }
   };
+  // Sem isso, um arquivo corrompido ou sem permissão de leitura deixava
+  // o modal parado para sempre: nenhuma mensagem, botão desabilitado, e
+  // o usuário achando que o dashboard travou.
+  fr.onerror = () => diz('Não deu para ler o arquivo do disco. Tente escolher de novo.');
   fr.readAsArrayBuffer(file);
 }
 
@@ -2140,6 +2567,20 @@ function parseRFNF613(txt){
     return isNaN(n) ? 0 : n;
   };
 
+  // num() devolve 0 para três coisas diferentes: bonificação de verdade,
+  // célula vazia e célula ilegível. Enquanto todo zero era descartado
+  // isso não fazia diferença. Agora que zero pode ENTRAR na base, faz
+  // toda: sem separar, uma mudança de layout do Senior que jogasse a
+  // coluna de valor em cima de um campo de texto entraria como milhares
+  // de bonificações silenciosas. null = não deu para ler; 0 = é zero.
+  const numEstrito = s => {
+    if(s == null) return null;
+    let v = String(s).trim().replace(/[\s\u00A0R$]/g,'');
+    if(!v || v === '-') return null;
+    v = decimalVirgula ? v.replace(/\./g,'').replace(',','.') : v.replace(/,/g,'');
+    return /^-?\d+(\.\d+)?$/.test(v) ? parseFloat(v) : null;
+  };
+
   const data = s => {
     let v = String(s||'').trim();
     if(!v || v === '-') return null;
@@ -2163,22 +2604,48 @@ function parseRFNF613(txt){
   };
 
   const out = [];
-  const rej = { naoNumerico:0, semData:0, semValor:0 };
+  const rej = { naoNumerico:0, semData:0, semValor:0, bonificacao:0 };
   const exemplos = { semData:null, semValor:null };
+  let bonificacao = 0, comValor = 0;
   let rep = null, cidade = null, uf = null;
+  // Sanidade do layout: numa linha de faturamento, qtd x preço unitário
+  // tem que dar o valor. Se o Senior mudar a ordem das colunas do
+  // RFNF613, o parser não quebra, ele importa número errado calado.
+  // Contando quantas linhas fecham a conta, uma queda brusca desse
+  // percentual denuncia a mudança de layout antes de gravar no banco.
+  let conferem = 0;
 
   for(const linha of cru){
     const c = dividir(linha, sep).map(x => x.replace(/^["\s]+|["\s]+$/g,''));
     const a = c[0] || '';
 
-    if(/^Representante/i.test(a)){ rep = (c[3]||'').trim() || null; continue; }
+    // Cidade e UF zeram junto com a troca de representante. Antes só
+    // mudavam quando aparecia uma linha "Cidade": um bloco de
+    // representante sem essa linha herdava a cidade do bloco anterior e
+    // atribuía o faturamento à praça errada, sem falhar nunca.
+    if(/^Representante/i.test(a)){ rep = (c[3]||'').trim() || null; cidade = null; uf = null; continue; }
     if(/^Cidade/i.test(a)){ cidade = (c[1]||'').trim() || null; uf = (c[5]||'').trim() || null; continue; }
     if(!/^\d+$/.test(a)){ rej.naoNumerico++; continue; }
 
     const dt = data(c[1]);
     if(!dt){ rej.semData++; if(!exemplos.semData) exemplos.semData = c.slice(0,4).join(' | '); continue; }
-    const valor = num(c[14]);
-    if(!valor){ rej.semValor++; if(!exemplos.semValor) exemplos.semValor = c.slice(12,16).join(' | '); continue; }
+    const valor = numEstrito(c[14]);
+    // Célula ilegível continua fora: isso não é bonificação, é linha
+    // quebrada, e entrar como zero seria inventar dado.
+    if(valor === null){ rej.semValor++; if(!exemplos.semValor) exemplos.semValor = c.slice(12,16).join(' | '); continue; }
+    if(valor === 0){
+      if(!CONFIG.CONTAR_BONIFICACAO){ rej.bonificacao++; continue; }
+      bonificacao++;
+    }
+
+    const qtd = num(c[10]), pu = num(c[12]);
+    // Só linhas com valor entram na conferência de layout: em linha de
+    // bonificação, qtd x 0 = 0 fecha sempre, e isso cegaria justamente o
+    // detector que existe para perceber coluna trocada de lugar.
+    if(valor !== 0){
+      comValor++;
+      if(Math.abs(qtd*pu - valor) <= Math.max(0.05, Math.abs(valor)*0.01)) conferem++;
+    }
 
     out.push({
       nf: a, emissao: dt,
@@ -2188,9 +2655,9 @@ function parseRFNF613(txt){
       derivacao   : (c[6] ||'').trim() || null,
       produto_desc: (c[8] ||'').trim() || null,
       cond_pgto   : (c[9] ||'').trim() || null,
-      qtd         : num(c[10]),
+      qtd,
       um          : (c[11]||'').trim() || null,
-      preco_unit  : num(c[12]),
+      preco_unit  : pu,
       valor,
       transportadora:(c[17]||'').trim() || null,
       representante: rep, cidade, uf
@@ -2202,7 +2669,7 @@ function parseRFNF613(txt){
     decimal: decimalVirgula ? 'vírgula (pt-BR)' : 'ponto',
     totalLinhas: cru.length,
     colunas: dividir(cru[6] || cru[0] || '', sep).length,
-    rej, exemplos,
+    rej, exemplos, conferem, bonificacao, comValor,
     primeiras: cru.slice(0,8).map(l => l.slice(0,150))
   };
   return out;
@@ -2224,20 +2691,67 @@ function dividir(linha, sep){
 }
 
 /* ---------- gravar ---------- */
+// Fechar a aba no meio da gravação deixa metade das linhas no banco sem
+// nunca publicar a carga: o rollback do catch não roda porque a página
+// já morreu. O aviso do navegador dá a chance de não fazer isso.
+let IMPORTANDO = false;
+window.addEventListener('beforeunload', e => {
+  if(!IMPORTANDO) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
 $('#btnGravar').onclick = async function(){
   if(!PENDENTE) return;
+
+  // Duas pessoas importando ao mesmo tempo: a segunda apaga a carga da
+  // primeira no passo final. Uma carga não publicada no banco denuncia
+  // que alguém está no meio do processo (ou que uma importação anterior
+  // morreu pelo caminho, e aí o aviso também é útil).
+  const { data:emVoo } = await sb.from('importacoes')
+    .select('usuario_email').eq('ativa', false).limit(1);
+  if(emVoo?.length){
+    const quem = emVoo[0].usuario_email || 'outro usuário';
+    const seguir = confirm(
+      `Há uma importação não concluída no banco (${quem}).\n\n` +
+      `Se alguém estiver importando agora, continuar vai apagar a carga dessa pessoa. ` +
+      `Se foi uma importação que falhou antes, pode seguir.\n\nContinuar mesmo assim?`);
+    if(!seguir) return;
+  }
+
+  IMPORTANDO = true;
   this.disabled = true; $('#btnFechar').disabled = true;
   const { data:{ user } } = await sb.auth.getUser();
   const datas = PENDENTE.linhas.map(l => l.emissao).sort();
   let novaId = null;
 
+  // A carga nova nasce invisível. Entre gravar as linhas novas e apagar
+  // as antigas, as duas coexistiam no banco, e quem abrisse o dashboard
+  // nesse intervalo (segundos a um minuto, conforme o tamanho) via o
+  // faturamento dobrado sem saber de nada. Agora o leitor só enxerga a
+  // importação marcada como ativa, e ela só vira ativa quando a última
+  // linha já entrou.
+  let usaAtiva = true;
+
   try{
     diz('Registrando a importação.');
-    const { data:imp, error:e1 } = await sb.from('importacoes').insert({
+    const cabecalhoImp = {
       arquivo: PENDENTE.nome, linhas: PENDENTE.linhas.length,
       periodo_ini: datas[0], periodo_fim: datas[datas.length-1],
       usuario_id: user.id, usuario_email: user.email
-    }).select().single();
+    };
+    let imp, e1;
+    ({ data:imp, error:e1 } = await sb.from('importacoes')
+      .insert({ ...cabecalhoImp, ativa:false }).select().single());
+
+    // Banco ainda sem a coluna 'ativa' (HTML publicado antes da
+    // migração): grava do jeito antigo em vez de travar a importação.
+    if(e1 && /ativa/i.test(e1.message || '')){
+      usaAtiva = false;
+      diz('Coluna "ativa" ausente no banco: gravando no modo antigo.');
+      ({ data:imp, error:e1 } = await sb.from('importacoes')
+        .insert(cabecalhoImp).select().single());
+    }
     if(e1) throw e1;
     novaId = imp.id;
 
@@ -2249,21 +2763,31 @@ $('#btnGravar').onclick = async function(){
       diz(`Gravadas ${mil(Math.min(i+passo, PENDENTE.linhas.length))} de ${mil(PENDENTE.linhas.length)} linhas.`);
     }
 
+    // O ponto de virada: daqui em diante o dashboard passa a ler a carga
+    // nova. Antes disso ele seguia lendo a antiga, inteira e coerente.
+    if(usaAtiva){
+      diz('Publicando a carga nova.');
+      const { error:e3 } = await sb.from('importacoes').update({ ativa:true }).eq('id', novaId);
+      if(e3) throw e3;
+    }
+
     diz('Removendo a carga anterior.');
-    const { error:e3 } = await sb.from('importacoes').delete().neq('id', novaId);
-    if(e3) throw e3;
+    const { error:e4 } = await sb.from('importacoes').delete().neq('id', novaId);
+    if(e4) throw e4;
 
     diz('Pronto. Atualizando o dashboard.');
     PENDENTE = null;
-    fundo.classList.remove('on');
+    fecharModal(fundo);
     await carregar();
   }catch(err){
+    console.error('[BI] gravar importação:', err);
     diz('Falhou: ' + (err.message || err));
     if(novaId){
       await sb.from('importacoes').delete().eq('id', novaId);
       diz('A carga parcial foi desfeita. Os dados anteriores continuam intactos.');
     }
   }finally{
+    IMPORTANDO = false;
     this.disabled = false; $('#btnFechar').disabled = false;
   }
 };
