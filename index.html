@@ -721,6 +721,12 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
      meses (a variável vem do JS). ---- */
   .graf-cliente svg{min-width:var(--piso-cliente,620px)}
 
+  /* Faturamento passou a ter dois números por coluna. No piso de 620px
+     os dois encolhem junto com o SVG e viram poeira; com 860 a coluna
+     volta a ter espaço de leitura e o gráfico rola de lado, como os
+     outros já fazem. */
+  .graf-denso svg{min-width:860px}
+
   /* ---- respiro acima do botão de fechar do popup ----
      .modal-cliente tem padding-top:44px no desktop para o nome não
      encostar no "×". A regra genérica de .modal no mobile sobrescrevia
@@ -881,6 +887,24 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // barra e no console, e é a primeira pergunta de qualquer suporte.
 const VERSAO = '2026.07.25';
 
+// Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
+// webview embutido e alguns modos de navegação substituem o console por
+// um stub incompleto, onde console.info simplesmente não existe. Como o
+// script é um bloco só, um TypeError no topo apagava tudo o que vinha
+// depois, inclusive a partida do dashboard: a tela ficava em branco por
+// causa de uma linha de carimbo de versão.
+const log = {
+  _(metodo, args){
+    try{
+      if(typeof console === 'undefined') return;
+      const f = console[metodo] || console.log;
+      if(typeof f === 'function') f.apply(console, args);
+    }catch(_){ /* console quebrado não é problema do usuário */ }
+  },
+  info(...a){ this._('info', a); },
+  erro(...a){ this._('error', a); }
+};
+
 const CONFIG = {
   SUPABASE_URL : 'https://limkqsbhblbctpajzjdz.supabase.co',
   SUPABASE_ANON: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpbWtxc2JoYmxiY3RwYWp6amR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDE3NjMsImV4cCI6MjEwMDM3Nzc2M30.MI-6648LdocP-lX7gqIO3WiMnHp7QoJYe65l3uE-n7o',
@@ -996,7 +1020,7 @@ async function entrar(){
     });
     if(error){ $('#erroLogin').textContent = 'E-mail ou senha não conferem.'; return; }
   }catch(err){
-    console.error('[BI] entrar():', err);
+    log.erro('[BI] entrar():', err);
     $('#erroLogin').textContent = 'Não deu para conectar. Confira sua internet e tente de novo.';
     return;
   }finally{
@@ -1011,8 +1035,9 @@ $('#btnSair').onclick = async () => {
   location.reload();
 };
 
-console.info(`[BI] Calmart BI Comercial v${VERSAO}`);
+// A partida vem primeiro; o carimbo é enfeite e fica atrás dele.
 sb.auth.getSession().then(({data}) => { if(data.session) abrir(); });
+log.info(`[BI] Calmart BI Comercial v${VERSAO}`);
 
 async function abrir(){
   const { data:{ user } } = await sb.auth.getUser();
@@ -1030,7 +1055,7 @@ async function abrir(){
     $('#fabImportar').style.display = PODE_IMPORTAR ? '' : 'none';
     await carregar();
   }catch(err){
-    console.error('[BI] abrir():', err);
+    log.erro('[BI] abrir():', err);
     if(sessaoExpirada(err)) return voltarAoLogin();
     $('#main').innerHTML = `<div class="vazio"><h3>Não deu para carregar</h3>
       <p>Falha de conexão ao verificar sua permissão ou buscar os dados. Recarregue a página.</p></div>`;
@@ -1100,7 +1125,7 @@ async function carregar(){
       if(idAtiva !== null) q = q.eq('importacao_id', idAtiva);
       const { data, error } = await q.range(de, de + passo - 1);
       if(error){
-        console.error('[BI] falha ao ler nf_itens:', error);
+        log.erro('[BI] falha ao ler nf_itens:', error);
         if(sessaoExpirada(error)) return voltarAoLogin();
         $('#main').innerHTML = `<div class="vazio"><h3>Não deu para ler o banco</h3><p>${esc(error.message)}</p></div>`;
         return;
@@ -1118,7 +1143,7 @@ async function carregar(){
   }catch(err){
     // console.error em todo catch: sem isso, um problema em produção não
     // deixa rastro nenhum e não há como diagnosticar pelo relato.
-    console.error('[BI] carregar():', err);
+    log.erro('[BI] carregar():', err);
     $('#main').innerHTML = '<div class="vazio"><h3>Não deu para ler o banco</h3><p>Falha de conexão. Recarregue a página e tente de novo.</p></div>';
   }
 }
@@ -1988,7 +2013,7 @@ function secFaturamento(B, ano, meta, filtroMes){
   s.appendChild(g);
 
   const p = el('div','painel'); p.style.marginTop = '12px';
-  p.innerHTML = `<div class="graf-rolo">${barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano, filtroMes)}</div>`;
+  p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano, filtroMes)}</div>`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
@@ -2023,16 +2048,20 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     if(P[i]>0) g += `<rect${A[i]>0 ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
     if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
     if(M[i]>0) g += `<line x1="${x+lg*0.46}" y1="${y(M[i])}" x2="${x+lg*0.86}" y2="${y(M[i])}" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3"/>`;
-    // Valor abreviado acima da barra que tem dado de verdade: o ano
-    // corrente (${ano}) quando já tem venda naquele mês; se ainda não
-    // chegou lá (mês futuro, A[i]=0), mostra o do ano anterior — nunca
-    // deixa o mês sem nenhum número em cima só porque o ano ainda não chegou.
-    const usaAtual = A[i] > 0;
-    const valorRotulo = usaAtual ? A[i] : P[i];
-    if(valorRotulo > 0){
-      const xRot = usaAtual ? x+lg*0.65 : x+lg*0.31;
-      g += `<text x="${xRot.toFixed(1)}" y="${(y(valorRotulo)-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" font-weight="600" fill="${usaAtual?'var(--azul)':'#8C94B2'}">${abrevBRL(valorRotulo)}</text>`;
-    }
+    // Cada barra com dado leva o próprio valor em cima, cada rótulo
+    // centrado na sua barra e na cor dela. Antes só o ano corrente
+    // ganhava número, e o anterior aparecia apenas como substituto nos
+    // meses que o ano corrente ainda não tinha alcançado: nos meses em
+    // que a comparação de fato existe, o termo de comparação era o
+    // único que ficava sem número escrito.
+    // Os centros ficam a 0,34 de largura de coluna um do outro (~30px no
+    // viewBox de 1160). Em corpo 9 o rótulo mais largo mede ~26px, então
+    // cabe; é por isso que o corpo não pode crescer aqui sem antes
+    // afastar as barras.
+    if(P[i] > 0)
+      g += `<text x="${(x+lg*0.31).toFixed(1)}" y="${(y(P[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="#8C94B2">${abrevBRL(P[i])}</text>`;
+    if(A[i] > 0)
+      g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(y(A[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)">${abrevBRL(A[i])}</text>`;
     g += `<text x="${x+lg/2}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
   }
   g += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
@@ -2530,7 +2559,7 @@ function ler(file){
       diz('Confira os números acima. Se baterem com o Senior, grave.');
       $('#btnGravar').disabled = false;
     }catch(err){
-      console.error('[BI] parse do CSV:', err);
+      log.erro('[BI] parse do CSV:', err);
       diz('Não deu para ler o arquivo: ' + err.message);
     }
   };
@@ -2768,6 +2797,11 @@ $('#btnGravar').onclick = async function(){
     if(usaAtiva){
       diz('Publicando a carga nova.');
       const { error:e3 } = await sb.from('importacoes').update({ ativa:true }).eq('id', novaId);
+      // Erro de GRANT é diferente de erro de RLS e a mensagem crua não
+      // diz o que fazer. Como a correção é uma linha de SQL, ela vai
+      // junto com o erro em vez de virar uma caça ao tesouro.
+      if(e3 && /permission denied/i.test(e3.message || ''))
+        throw new Error('sem permissão de UPDATE em importacoes. Rode no SQL Editor do Supabase: grant update on public.importacoes to authenticated;');
       if(e3) throw e3;
     }
 
@@ -2780,7 +2814,7 @@ $('#btnGravar').onclick = async function(){
     fecharModal(fundo);
     await carregar();
   }catch(err){
-    console.error('[BI] gravar importação:', err);
+    log.erro('[BI] gravar importação:', err);
     diz('Falhou: ' + (err.message || err));
     if(novaId){
       await sb.from('importacoes').delete().eq('id', novaId);
