@@ -2108,15 +2108,26 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     // desenhadas depois do laço inteiro, para passar por cima das doze
     // barras de uma vez, como uma trilha de meta atravessando o ano.
     if(M[i] > 0) pontosMeta.push([x+lg*0.66, y(M[i]), i]);
-    // Rótulo só na meta fixada (ago–dez/2026 hoje), e só enquanto o mês
-    // ainda não começou: A[i]===0 é o mesmo sinal que o resto do gráfico
-    // usa para "esse mês ainda não tem NF nenhuma". No instante em que a
-    // primeira NF do mês entra, A[i] passa a ser >0, a barra azul nasce
-    // com o próprio rótulo bem ali do lado, e o da meta soma nesse ponto
-    // porque o alvo já foi substituído pelo realizado como a informação
-    // que importa olhar naquela coluna.
-    if(M[i] > 0 && A[i] === 0 && temMetaFixaNoMes(ano, i))
-      g += `<text x="${(x+lg*0.66).toFixed(1)}" y="${(y(M[i])-8).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--sinal)">${abrevBRL(M[i])}</text>`;
+    // Rótulo do valor da meta, em ago–dez/2026 (ou qualquer mês com
+    // entrada em METAS_FIXAS). Antes sumia assim que a primeira NF do
+    // mês entrava (A[i] deixava de ser 0) — pedido revertido: o valor
+    // precisa ficar visível o mês inteiro, inclusive no mês vigente, em
+    // vez de dar lugar ao rótulo do realizado.
+    // Com os dois rótulos passando a coexistir na mesma coluna (a meta
+    // fica bem em cima da bolinha da trilha, quase na mesma posição
+    // horizontal do valor realizado), o risco novo é eles colidirem
+    // quando o realizado se aproxima do alvo — quanto mais perto da
+    // meta, mais perto no eixo vertical os dois textos ficam. Por isso,
+    // se a distância entre as duas alturas for pequena, o da meta sobe
+    // mais um degrau em vez de ficar colado.
+    if(M[i] > 0 && temMetaFixaNoMes(ano, i)){
+      let yMeta = y(M[i]) - 8;
+      if(A[i] > 0){
+        const yAtual = y(A[i]) - 6;
+        if(Math.abs(yMeta - yAtual) < 12) yMeta = Math.min(yMeta, yAtual) - 12;
+      }
+      g += `<text x="${(x+lg*0.66).toFixed(1)}" y="${yMeta.toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="700" fill="var(--sinal)">${abrevBRL(M[i])}</text>`;
+    }
     // Cada barra com dado leva o próprio valor em cima, cada rótulo
     // centrado na sua barra e na cor dela. Antes só o ano corrente
     // ganhava número, e o anterior aparecia apenas como substituto nos
@@ -2137,8 +2148,8 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
   // das barras — desce e sobe como uma trilha, em vez do traço picado de
   // antes, que dava a impressão errada de doze metas soltas em vez de
   // uma trajetória. A bolinha em cada mês marca o ponto exato; o title
-  // dá o valor a quem passar o mouse, sem depender do rótulo de texto,
-  // que só aparece em ago–dez e só antes do mês começar.
+  // dá o valor a quem passar o mouse, útil nos meses que não têm o
+  // rótulo de texto (todo mês sem meta fixada em METAS_FIXAS).
   if(pontosMeta.length){
     const caminho = pontosMeta.map(([px,py], k) => `${k===0?'M':'L'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
     g += `<path d="${caminho}" fill="none" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3" stroke-linejoin="round"/>`;
