@@ -2068,14 +2068,11 @@ function secFaturamento(B, ano, meta, filtroMes){
   // sem que nada tenha mudado no faturamento real daquele mês.
   const linhaMeta = P.map((v,i) => metaDoMes(ano, i, v, meta));
   p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, linhaMeta, ultimo, ano, filtroMes)}</div>`;
-  const legendaMeta = anoTemAlgumaMetaFixa(ano)
-    ? `meta (${ano-1} +${(meta*100).toFixed(0)}% · alguns meses fixados)`
-    : `meta (${ano-1} +${(meta*100).toFixed(0)}%)`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
       <span><i style="background:#C2CCE2"></i>${ano-1}</span>
-      <span><i style="background:var(--sinal)"></i>${legendaMeta}</span>
+      <span><i style="background:var(--sinal)"></i>meta</span>
     </div>`);
   s.appendChild(p);
   return s;
@@ -2086,6 +2083,7 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
   const max = Math.max(...A, ...P, ...M, 1)*1.12;
   const lg = (W-e-d)/12, y = v => t + (H-t-b)*(1 - v/max);
   let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal comparado">`;
+  const pontosMeta = [];   // [x, y, i] de cada mês com meta > 0; vira a trilha contínua depois do laço
   for(let i=0;i<=4;i++){
     const v = max*i/4, yy = y(v);
     g += `<line x1="${e}" y1="${yy}" x2="${W-d}" y2="${yy}" stroke="#EEF1F8"/>
@@ -2104,7 +2102,21 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     // meio de uma coluna que o usuário acabou de aprender que é clicável.
     if(P[i]>0) g += `<rect${A[i]>0 ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
     if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
-    if(M[i]>0) g += `<line x1="${x+lg*0.46}" y1="${y(M[i])}" x2="${x+lg*0.86}" y2="${y(M[i])}" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    // Antes cada mês desenhava seu próprio traço solto, sem ligação com
+    // o do mês vizinho — a meta "pulava" de coluna em coluna. Agora só
+    // acumula o ponto aqui; a linha (uma só, contínua) e as bolinhas são
+    // desenhadas depois do laço inteiro, para passar por cima das doze
+    // barras de uma vez, como uma trilha de meta atravessando o ano.
+    if(M[i] > 0) pontosMeta.push([x+lg*0.66, y(M[i]), i]);
+    // Rótulo só na meta fixada (ago–dez/2026 hoje), e só enquanto o mês
+    // ainda não começou: A[i]===0 é o mesmo sinal que o resto do gráfico
+    // usa para "esse mês ainda não tem NF nenhuma". No instante em que a
+    // primeira NF do mês entra, A[i] passa a ser >0, a barra azul nasce
+    // com o próprio rótulo bem ali do lado, e o da meta soma nesse ponto
+    // porque o alvo já foi substituído pelo realizado como a informação
+    // que importa olhar naquela coluna.
+    if(M[i] > 0 && A[i] === 0 && temMetaFixaNoMes(ano, i))
+      g += `<text x="${(x+lg*0.66).toFixed(1)}" y="${(y(M[i])-8).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--sinal)">${abrevBRL(M[i])}</text>`;
     // Cada barra com dado leva o próprio valor em cima, cada rótulo
     // centrado na sua barra e na cor dela. Antes só o ano corrente
     // ganhava número, e o anterior aparecia apenas como substituto nos
@@ -2120,6 +2132,19 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     if(A[i] > 0)
       g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(y(A[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)">${abrevBRL(A[i])}</text>`;
     g += `<text x="${x+lg/2}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
+  }
+  // Uma linha só, ligando os doze pontos em ordem (M-L-L-L...), por cima
+  // das barras — desce e sobe como uma trilha, em vez do traço picado de
+  // antes, que dava a impressão errada de doze metas soltas em vez de
+  // uma trajetória. A bolinha em cada mês marca o ponto exato; o title
+  // dá o valor a quem passar o mouse, sem depender do rótulo de texto,
+  // que só aparece em ago–dez e só antes do mês começar.
+  if(pontosMeta.length){
+    const caminho = pontosMeta.map(([px,py], k) => `${k===0?'M':'L'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
+    g += `<path d="${caminho}" fill="none" stroke="var(--sinal)" stroke-width="2" stroke-dasharray="4 3" stroke-linejoin="round"/>`;
+    pontosMeta.forEach(([px,py,i]) => {
+      g += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="var(--sinal)" stroke="#fff" stroke-width="1.5"><title>Meta ${MES[i]}/${ano}: ${abrevBRL(M[i])}</title></circle>`;
+    });
   }
   g += `<line x1="${e}" y1="${H-b}" x2="${W-d}" y2="${H-b}" stroke="#00034A"/></svg>`;
   return g;
