@@ -933,10 +933,10 @@ const CONFIG = {
   // regra de 25% APENAS nesses meses. Onde não há entrada aqui, vale a
   // regra de sempre (mesmo mês do ano anterior × 1,25). Índice do mês é
   // 0-based (jan=0 ... dez=11), igual ao array MES.
-  // Ago–dez/2026 fixados nesta sessão; jul/2026 e todo o resto do
-  // histórico seguem a regra, porque julho ainda estava fechando.
+  // Jul–dez/2026 fixados: julho entrou na revisão porque fechou com
+  // valor diferente do que a regra de 25% projetava.
   METAS_FIXAS: {
-    2026: { 7:476000, 8:496000, 9:594000, 10:547000, 11:387000 }
+    2026: { 6:417000, 7:491000, 8:513000, 9:614000, 10:565000, 11:400000 }
   },
 
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
