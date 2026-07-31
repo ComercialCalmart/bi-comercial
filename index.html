@@ -233,6 +233,20 @@ header .marca span{color:var(--menta)}
 .resumo-label{
   display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.08em;
   text-transform:uppercase;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:12px;
+  /* O título passou a carregar a meta em R$, então ficou bem mais longo.
+     Cabe folgado no desktop (~266px num bloco de 318px), mas num
+     aparelho de 320px sobram só ~200px para o rótulo inteiro: sem
+     wrap, o selo seria espremido ou vazaria. Quebrando, ele desce
+     para a própria linha e o título usa a largura toda. */
+  flex-wrap:wrap;
+}
+.resumo-label-txt{min-width:0}
+/* O valor da meta dentro do título é dado, não legenda: mono e um pouco
+   mais claro que o resto do rótulo, para o olho separar as duas coisas
+   sem precisar de mais uma linha de texto. */
+.resumo-label b{
+  font-family:var(--mono);font-weight:600;letter-spacing:.02em;
+  color:rgba(255,255,255,.78);
 }
 .resumo-label i{width:6px;height:6px;border-radius:50%;flex:0 0 auto}
 /* Selo explícito da meta de crescimento fixa, nos dois cards de meta —
@@ -1780,7 +1794,7 @@ function kpi(rot, val, pe, delta){
 // perseguição de alvo.
 function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra, metaFixa){
   const b = el('div', 'resumo-bloco resumo-meta status-' + status);
-  const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
+  const lab = el('div','resumo-label'); lab.innerHTML = `<i></i><span class="resumo-label-txt">${label}</span>`;
   // O selo "+25% a.a." descreve a regra padrão. Num mês (ou ano com
   // algum mês) fixado em CONFIG.METAS_FIXAS, o número já não vem dessa
   // regra, então o selo mentiria; "meta fixada" é o que de fato mudou.
@@ -1875,7 +1889,7 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
     }
     const difAnoPassado = P[ultimo] ? (realizado/P[ultimo] - 1)*100 : 0;
     return {
-      rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, unidade:'dia',
+      rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, periodoCurto: `${MES[ultimo]}/${ano}`, unidade:'dia',
       realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
       semBase: `Sem faturamento em ${MES[ultimo]}/${ano-1} para calcular a meta do mês.`,
       difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`
@@ -1912,7 +1926,7 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   const metaAcum = accP*(1+meta);   // meta do mesmo período (não do ano todo) — é a comparação que já existia
   const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
   return {
-    rotulo: `Meta anual · ${ano}`, unidade:'mês',
+    rotulo: `Meta anual · ${ano}`, periodoCurto: String(ano), unidade:'mês',
     realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
     semBase: `Sem faturamento em ${ano-1} para calcular uma meta anual.`,
     difComparativo: difMesmoPeriodo, comparativoTexto: `mesmo período de ${ano-1}`
@@ -1922,11 +1936,20 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
 // A partir de uma vista (ano ou mês), monta o bloco pronto pro grid.
 function blocoDaVista(vista){
   const status = !vista.temMeta ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
+  // O número grande do cartão é o FATURADO. Antes o título dizia "Meta
+  // anual" logo acima dele e o olho amarrava as duas coisas, enquanto a
+  // meta de verdade ficava no menor texto do bloco, depois de um "%".
+  // Agora o título entrega o que promete: período + meta em R$, e o
+  // número grande fica sem rótulo concorrente. A linha de apoio perde o
+  // valor da meta (que subiu) e fica só com o progresso.
+  const titulo = vista.temMeta
+    ? `${vista.periodoCurto} · meta <b>${brl(vista.metaPeriodo)}</b>`
+    : vista.rotulo;
   const linhaMeta = !vista.temMeta
     ? vista.semBase
     : vista.falta > 0
-      ? `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · faltam ${brl(vista.falta)}`
-      : `${vista.pct.toFixed(0)}% de <b>${brl(vista.metaPeriodo)}</b> · meta batida, ${brl(-vista.falta)} acima`;
+      ? `${vista.pct.toFixed(0)}% · faltam ${brl(vista.falta)}`
+      : `${vista.pct.toFixed(0)}% · meta batida, ${brl(-vista.falta)} acima`;
   const chip = vista.acimaDoRitmo == null ? ''
     : `<span class="ritmo-chip">${vista.acimaDoRitmo ? 'acima do ritmo' : 'abaixo do ritmo'}</span>`;
   const linhaRitmo = !vista.temMeta ? null
@@ -1934,7 +1957,7 @@ function blocoDaVista(vista){
       ? `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade} · necessário ${brl(vista.ritmoNecessario)}/${vista.unidade}`
       : `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade}`;
   return blocoMeta(
-    status, vista.rotulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
+    status, titulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
     `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
     vista.metaFixa
   );
