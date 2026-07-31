@@ -928,6 +928,17 @@ const CONFIG = {
   // fixo por decisão de negócio — não tem mais campo editável; muda
   // aqui, e só aqui, se um dia precisar mudar de novo.
   META_CRESCIMENTO  : 0.25, // 25% de crescimento sobre o mesmo período do ano anterior
+
+  // Meta em R$ fixada mês a mês, por decisão de negócio, substituindo a
+  // regra de 25% APENAS nesses meses. Onde não há entrada aqui, vale a
+  // regra de sempre (mesmo mês do ano anterior × 1,25). Índice do mês é
+  // 0-based (jan=0 ... dez=11), igual ao array MES.
+  // Ago–dez/2026 fixados nesta sessão; jul/2026 e todo o resto do
+  // histórico seguem a regra, porque julho ainda estava fechando.
+  METAS_FIXAS: {
+    2026: { 7:476000, 8:496000, 9:594000, 10:547000, 11:387000 }
+  },
+
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
   ATRASO_MINIMO     : 21,   // dias de atraso para entrar na worklist
 
@@ -1767,10 +1778,14 @@ function kpi(rot, val, pe, delta){
 // progresso e uma linha de ritmo a mais. Só existe nesses dois porque
 // só eles têm meta contra a qual progredir; o terceiro é contagem, não
 // perseguição de alvo.
-function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra){
+function blocoMeta(status, label, valor, pct, linhaMeta, linhaRitmo, contextoExtra, metaFixa){
   const b = el('div', 'resumo-bloco resumo-meta status-' + status);
   const lab = el('div','resumo-label'); lab.innerHTML = `<i></i>${label}`;
-  const tagCrescimento = el('span','meta-crescimento', `+${Math.round(CONFIG.META_CRESCIMENTO*100)}% a.a.`);
+  // O selo "+25% a.a." descreve a regra padrão. Num mês (ou ano com
+  // algum mês) fixado em CONFIG.METAS_FIXAS, o número já não vem dessa
+  // regra, então o selo mentiria; "meta fixada" é o que de fato mudou.
+  const tagCrescimento = el('span','meta-crescimento',
+    metaFixa ? 'meta fixada' : `+${Math.round(CONFIG.META_CRESCIMENTO*100)}% a.a.`);
   lab.appendChild(tagCrescimento);
   const val = el('div','resumo-valor'); val.textContent = valor;
   const barra = el('div','meta-barra');
@@ -1810,6 +1825,27 @@ function blocoDuplo(mini1, mini2){
 // Monta a "vista" de uma meta (ano ou mês) — mesma sistemática pros
 // dois, só troca a unidade de tempo (ano↔mês, mês↔dia). Extraída como
 // função porque agora os dois blocos existem ao mesmo tempo, sempre.
+// Meta de um mês específico: fixa (CONFIG.METAS_FIXAS), quando existir
+// para esse ano/mês, senão a regra de sempre (mesmo mês do ano anterior
+// × (1+meta)). Um único ponto de decisão usado pelos dois cartões do
+// resumo e pelo gráfico, para as três vistas nunca poderem divergir
+// sobre qual meta vale para um mês.
+function metaDoMes(ano, mes, valorAnoAnterior, meta){
+  const fixa = CONFIG.METAS_FIXAS?.[ano]?.[mes];
+  return fixa != null ? fixa : valorAnoAnterior * (1+meta);
+}
+function temMetaFixaNoMes(ano, mes){ return CONFIG.METAS_FIXAS?.[ano]?.[mes] != null; }
+function anoTemAlgumaMetaFixa(ano){ return !!CONFIG.METAS_FIXAS?.[ano]; }
+
+// Soma de metaDoMes de janeiro até o mês `ate` (inclusive), 0-based.
+// ate=11 dá a meta do ano inteiro; ate=ultimo dá a meta do acumulado até
+// o mês em exibição, para comparar com o que já foi faturado até ali.
+function somaMetas(ano, P, meta, ate){
+  let s = 0;
+  for(let i=0;i<=ate;i++) s += metaDoMes(ano, i, P[i]||0, meta);
+  return s;
+}
+
 function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   if(periodo === 'mes'){
     const diasNoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
@@ -1821,8 +1857,12 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
     const mesEmAndamento = (ano === hoje.getUTCFullYear() && ultimo === hoje.getUTCMonth());
     const diaAtual = mesEmAndamento ? hoje.getUTCDate() : diasNoMes;
     const realizado = A[ultimo] || 0;
-    const metaPeriodo = (P[ultimo] || 0) * (1+meta);
-    const temMeta = temAno && metaPeriodo > 0;
+    const metaPeriodo = metaDoMes(ano, ultimo, P[ultimo] || 0, meta);
+    const metaFixa = temMetaFixaNoMes(ano, ultimo);
+    // Com meta fixa, o alvo existe por decisão de negócio mesmo que o
+    // mesmo mês do ano passado não tenha faturamento algum — diferente
+    // da regra padrão, que sem base no ano anterior não tem o que multiplicar.
+    const temMeta = metaFixa ? true : (temAno && metaPeriodo > 0);
     const falta = metaPeriodo - realizado;
     const pct = temMeta ? realizado/metaPeriodo*100 : 0;
     const unidadesRestantes = diasNoMes - diaAtual;
@@ -1836,14 +1876,19 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
     const difAnoPassado = P[ultimo] ? (realizado/P[ultimo] - 1)*100 : 0;
     return {
       rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, unidade:'dia',
-      realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
+      realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
       semBase: `Sem faturamento em ${MES[ultimo]}/${ano-1} para calcular a meta do mês.`,
       difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`
     };
   }
   const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
   const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
-  const metaPeriodo = P.reduce((a,b)=>a+b,0) * (1+meta);   // ano passado inteiro + meta%
+  // Meta anual = soma de 12 metas mensais, cada uma resolvida por
+  // metaDoMes: regra de 25% nos meses sem entrada em METAS_FIXAS, valor
+  // fixo nos que têm. Antes era só "ano passado inteiro × 1,25"; agora é
+  // a mesma conta, mês a mês, com a exceção plugada em um lugar só.
+  const metaPeriodo = somaMetas(ano, P, meta, 11);
+  const metaFixa = anoTemAlgumaMetaFixa(ano);
   const temMeta = temAno && metaPeriodo > 0;
   const falta = metaPeriodo - accA;
   const pct = temMeta ? accA/metaPeriodo*100 : 0;
@@ -1868,7 +1913,7 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
   return {
     rotulo: `Meta anual · ${ano}`, unidade:'mês',
-    realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo,
+    realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
     semBase: `Sem faturamento em ${ano-1} para calcular uma meta anual.`,
     difComparativo: difMesmoPeriodo, comparativoTexto: `mesmo período de ${ano-1}`
   };
@@ -1890,7 +1935,8 @@ function blocoDaVista(vista){
       : `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade}`;
   return blocoMeta(
     status, vista.rotulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
-    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`
+    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
+    vista.metaFixa
   );
 }
 
@@ -2002,23 +2048,34 @@ function secFaturamento(B, ano, meta, filtroMes){
     const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
     const accP = P.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
     const dif  = accP ? (accA/accP - 1)*100 : 0;
-    const metaAcc = accP*(1+meta);
+    // Mesma regra do resumo: soma metaDoMes de jan até `ultimo`, então
+    // meses com override em METAS_FIXAS entram com o valor fixo assim
+    // que ficarem "em exibição" (tiverem alguma venda no ano corrente).
+    const metaAcc = somaMetas(ano, P, meta, ultimo);
     g.appendChild(kpi(`Acumulado ${ano}`, brl(accA), temAno ? `até ${MES[ultimo]}` : `sem faturamento em ${ano}`));
     g.appendChild(kpi(`Acumulado ${ano-1}`, brl(accP), 'mesmos meses'));
     g.appendChild(kpi('Variação sobre o ano anterior', pct(dif), 'acumulado', dif));
-    g.appendChild(accP > 0
+    g.appendChild(accP > 0 || anoTemAlgumaMetaFixa(ano)
       ? kpi('Meta do acumulado', brl(metaAcc), accA >= metaAcc ? 'atingida' : 'faltam ' + brl(metaAcc-accA))
       : kpi('Meta do acumulado', 'sem base', `${ano-1} não tem faturamento na base`));
   }
   s.appendChild(g);
 
   const p = el('div','painel'); p.style.marginTop = '12px';
-  p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, P.map(v=>v*(1+meta)), ultimo, ano, filtroMes)}</div>`;
+  // Cada mês resolve sua própria meta: regra de 25% por padrão, valor
+  // fixo onde CONFIG.METAS_FIXAS tiver entrada. É por isso que a linha
+  // tracejada no gráfico pode mudar de inclinação a partir de um mês
+  // sem que nada tenha mudado no faturamento real daquele mês.
+  const linhaMeta = P.map((v,i) => metaDoMes(ano, i, v, meta));
+  p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, linhaMeta, ultimo, ano, filtroMes)}</div>`;
+  const legendaMeta = anoTemAlgumaMetaFixa(ano)
+    ? `meta (${ano-1} +${(meta*100).toFixed(0)}% · alguns meses fixados)`
+    : `meta (${ano-1} +${(meta*100).toFixed(0)}%)`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
       <span><i style="background:#C2CCE2"></i>${ano-1}</span>
-      <span><i style="background:var(--sinal)"></i>meta (${ano-1} +${(meta*100).toFixed(0)}%)</span>
+      <span><i style="background:var(--sinal)"></i>${legendaMeta}</span>
     </div>`);
   s.appendChild(p);
   return s;
