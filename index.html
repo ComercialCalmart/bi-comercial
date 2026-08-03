@@ -899,7 +899,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.03c';
+const VERSAO = '2026.08.03d';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -2162,7 +2162,15 @@ function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
     // precisa do próprio data-mes: sem isso ela vira um buraco morto no
     // meio de uma coluna que o usuário acabou de aprender que é clicável.
     if(P[i]>0) g += `<rect${A[i]>0 ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(P[i])}" width="${w}" height="${H-b-y(P[i])}" fill="#C2CCE2"/>`;
-    if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
+    // Fade = mês selecionado, e só ele. Antes o fade marcava o último
+    // mês com venda, como quem diz "esse ainda está correndo, não
+    // compare de igual para igual" — mas isso passou a mentir assim que
+    // um mês fecha (julho fechado aparecia apagado), e pior: ao
+    // selecionar esse mês ele ficava igual aos outros, invertendo o
+    // sentido do destaque. Agora todos os meses têm a mesma cor e o
+    // selecionado é o que muda, fade mais contorno escuro, lido como
+    // "esta é a coluna em foco".
+    if(A[i]>0) g += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(A[i])}" width="${w}" height="${H-b-y(A[i])}" fill="var(--azul)" opacity="${ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>`;
     // Antes cada mês desenhava seu próprio traço solto, sem ligação com
     // o do mês vizinho — a meta "pulava" de coluna em coluna. Agora só
     // acumula o ponto aqui; a linha (uma só, contínua) e as bolinhas são
@@ -2428,7 +2436,6 @@ function secCompradores(B, ano, filtroMes){
     return { mes: mes.map(x=>x.size), tot: tot.size };
   };
   const a = cont(ano), p = cont(ano-1);
-  const ultimo = a.mes.reduce((u,v,i) => v>0 ? i : u, 0);
 
   const g = el('div','grade');
   if(noMes){
@@ -2457,7 +2464,7 @@ function secCompradores(B, ano, filtroMes){
     // para o clique e o rótulo do mês funcionarem igual nos dois.
     if(a.mes[i]) sv += `<rect data-mes="${i}" data-ano="${ano}" x="${x}" y="${t}" width="${lg}" height="${H-t-6}" fill="transparent" pointer-events="all" style="cursor:pointer"/>`;
     if(p.mes[i]) sv += `<rect${a.mes[i] ? ` data-mes="${i}" data-ano="${ano}"` : ''} x="${x+lg*0.16}" y="${y(p.mes[i])}" width="${w}" height="${H-b-y(p.mes[i])}" fill="#C2CCE2"/>`;
-    if(a.mes[i]) sv += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(a.mes[i])}" width="${w}" height="${H-b-y(a.mes[i])}" fill="var(--azul)" opacity="${i===ultimo && !ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>
+    if(a.mes[i]) sv += `<rect data-mes="${i}" data-ano="${ano}" x="${x+lg*0.50}" y="${y(a.mes[i])}" width="${w}" height="${H-b-y(a.mes[i])}" fill="var(--azul)" opacity="${ativo?0.45:1}"${ativo?' stroke="var(--tinta)" stroke-width="2"':''}><title>${ativo ? 'Clique para soltar o foco' : `Clique para focar em ${MES[i]}/${ano}`}</title></rect>
       <text x="${x+lg*0.65}" y="${y(a.mes[i])-5}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6689">${a.mes[i]}</text>`;
     sv += `<text x="${x+lg/2}" y="${H-10}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
   }
