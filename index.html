@@ -899,7 +899,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.03d';
+const VERSAO = '2026.08.03e';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -1239,6 +1239,12 @@ function ultimoMesComVenda(linhas, ano){
   return m;
 }
 function mediana(v){
+  // Lista vazia devolvia (undefined+undefined)/2 = NaN, que se propaga
+  // silencioso: ritmo NaN vira atraso NaN, e a comparação NaN >= corte é
+  // sempre falsa, então o cliente sumia da worklist sem erro nenhum.
+  // Hoje as chamadas garantem no mínimo 3 intervalos (MIN_COMPRAS_RITMO
+  // é 4), mas baixar essa constante para 1 abriria o buraco.
+  if(!v.length) return 0;
   const s=[...v].sort((a,b)=>a-b), m=s.length>>1;
   return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
 }
@@ -2128,7 +2134,7 @@ function secFaturamento(B, ano, meta, filtroMes){
   // tracejada no gráfico pode mudar de inclinação a partir de um mês
   // sem que nada tenha mudado no faturamento real daquele mês.
   const linhaMeta = P.map((v,i) => metaDoMes(ano, i, v, meta));
-  p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, linhaMeta, ultimo, ano, filtroMes)}</div>`;
+  p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, linhaMeta, ano, filtroMes)}</div>`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
@@ -2139,7 +2145,7 @@ function secFaturamento(B, ano, meta, filtroMes){
   return s;
 }
 
-function barrasDuplas(A, P, M, ultimo, ano, filtroMes){
+function barrasDuplas(A, P, M, ano, filtroMes){
   const W=1160,H=300,e=64,d=16,t=22,b=34;
   const max = Math.max(...A, ...P, ...M, 1)*1.12;
   const lg = (W-e-d)/12, y = v => t + (H-t-b)*(1 - v/max);
@@ -2308,7 +2314,7 @@ function secABC(B, ano, hoje, jan, filtroMes){
   const listaOrdenada = ordenar(lista, 'abc', {
     pos: c => c.pos,
     classe: c => c.classe,
-    cliente: c => c.nome.toLowerCase(),
+    cliente: c => (c.nome||'').toLowerCase(),
     faturamento: c => c.fat,
     pctTotal: c => c.share,
     pctAcum: c => c.acc,
@@ -2428,14 +2434,27 @@ function secCompradores(B, ano, filtroMes){
   const noMes = !!(filtroMes && filtroMes.ano === ano);
   cabecalho(s, 'Clientes compradores', 'unidades', noMes ? `${MES[filtroMes.mes]}/${ano} em foco` : null, 'clique num mês para focar');
 
-  const cont = (y) => {
+  // Até que mês comparar. O total de compradores do ano corrente é
+  // parcial (vai até o último mês com venda), e comparar ele contra o
+  // ano anterior INTEIRO é parcial contra completo: com 7 meses de 2026
+  // (76 clientes) contra 12 meses de 2025 (70), a tela dizia +8,6% de
+  // crescimento, quando os mesmos 7 meses de 2025 tiveram 28 clientes e
+  // o crescimento real é +171,4%. A seção Faturamento, logo acima, já
+  // recortava "mesmos meses"; esta ficou para trás.
+  const ultimo = Math.max(0, ultimoMesComVenda(B, ano));
+
+  const cont = (y, ate) => {
     const mes = Array.from({length:12}, () => new Set()), tot = new Set();
     B.filter(r => r.dt.getUTCFullYear() === y).forEach(r => {
-      mes[r.dt.getUTCMonth()].add(r.ck); tot.add(r.ck);
+      const m = r.dt.getUTCMonth();
+      mes[m].add(r.ck);
+      // Cliente distinto no período não é soma de meses (quem compra em
+      // março e em maio conta uma vez), por isso o conjunto próprio.
+      if(m <= ate) tot.add(r.ck);
     });
     return { mes: mes.map(x=>x.size), tot: tot.size };
   };
-  const a = cont(ano), p = cont(ano-1);
+  const a = cont(ano, ultimo), p = cont(ano-1, ultimo);
 
   const g = el('div','grade');
   if(noMes){
@@ -2446,8 +2465,8 @@ function secCompradores(B, ano, filtroMes){
     g.appendChild(kpi('Variação', pct(dif), 'sobre o mesmo mês', dif));
   } else {
     const dif = p.tot ? (a.tot/p.tot - 1)*100 : 0;
-    g.appendChild(kpi(`Compradores em ${ano}`, mil(a.tot), 'clientes distintos no ano'));
-    g.appendChild(kpi(`Compradores em ${ano-1}`, mil(p.tot), 'ano inteiro'));
+    g.appendChild(kpi(`Compradores em ${ano}`, mil(a.tot), `clientes distintos até ${MES[ultimo]}`));
+    g.appendChild(kpi(`Compradores em ${ano-1}`, mil(p.tot), 'mesmos meses'));
     g.appendChild(kpi('Variação', pct(dif), 'sobre o ano anterior', dif));
   }
   s.appendChild(g);
@@ -2502,7 +2521,7 @@ function secPerdidos(B, hoje, jan, filtroMes){
   // 640px). Estilo inline não daria pra sobrescrever sem !important.
   const r = el('div','rolo rolo-limite'); r.style.marginTop='12px';
   const listaOrdenada = ordenar(lista, 'perdidos', {
-    cliente: c => c.nome.toLowerCase(),
+    cliente: c => (c.nome||'').toLowerCase(),
     faturamento: c => c.fat,
     ultima: c => c.ult.getTime(),
     dias: c => c.dias
@@ -2568,7 +2587,7 @@ function secCadencia(B, hoje, filtroMes){
     pnKpi.appendChild(kpi('Receita de 12 meses na fila', brl(fila.reduce((a,b)=>a+b.r12,0)), 'peso financeiro desses clientes'));
 
     const filaOrdenada = ordenar(fila, 'cadencia', {
-      cliente: c => c.nome.toLowerCase(),
+      cliente: c => (c.nome||'').toLowerCase(),
       ritmo: c => c.ritmo,
       compras: c => c.n,
       ultima: c => c.ult.getTime(),
