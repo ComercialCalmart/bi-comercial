@@ -899,7 +899,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.03b';
+const VERSAO = '2026.08.03c';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -1933,8 +1933,14 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
     else if(mesesRestantes > 0){ ritmoNecessario = falta/mesesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
     else acimaDoRitmo = false;   // dezembro, meta ainda não batida: não sobra mês pra recuperar
   }
-  const metaAcum = accP*(1+meta);   // meta do mesmo período (não do ano todo) — é a comparação que já existia
-  const difMesmoPeriodo = metaAcum ? (accA/metaAcum - 1)*100 : 0;
+  // O rótulo deste chip é "vs. mesmo período de {ano-1}", mas a conta
+  // comparava com a META daquele período (accP × 1,25), devolvendo
+  // +43,4% onde o realizado contra o realizado dá +79,2% — número que o
+  // KPI "Variação sobre o ano anterior", logo abaixo na mesma tela, já
+  // mostrava. Duas leituras diferentes da mesma comparação. O card já
+  // mostra o progresso contra a meta na barra e na linha de "faltam",
+  // então aqui o que falta mesmo é o ano contra ano.
+  const difMesmoPeriodo = accP ? (accA/accP - 1)*100 : 0;
   return {
     rotulo: `Meta anual · ${ano}`, periodoCurto: String(ano), unidade:'mês',
     realizado:accA, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
@@ -2083,14 +2089,20 @@ function secFaturamento(B, ano, meta, filtroMes){
   if(noMes){
     const mi = filtroMes.mes;
     const dif = P[mi] ? (A[mi]/P[mi] - 1)*100 : 0;
-    const metaMes = P[mi]*(1+meta);
+    // Passou a resolver pelo metaDoMes, igual ao card do topo e à linha
+    // do gráfico. Este KPI tinha ficado para trás na regra dos 25%: com
+    // julho fixado em R$ 417.000, ele exibia R$ 267.967,78 (o mesmo mês
+    // de 2025 × 1,25) e dizia "atingida", enquanto o card do topo, logo
+    // acima, mostrava o alvo certo e faltando R$ 23 mil.
+    const metaMes = metaDoMes(ano, mi, P[mi] || 0, meta);
+    const temMetaMes = P[mi] > 0 || temMetaFixaNoMes(ano, mi);
     g.appendChild(kpi(`Faturamento em ${MES[mi]}/${ano}`, brl(A[mi]), 'no mês'));
     g.appendChild(kpi(`Mesmo mês em ${ano-1}`, brl(P[mi]), MES[mi]));
     g.appendChild(kpi('Variação sobre o mesmo mês', pct(dif), '', dif));
     // Sem faturamento no mesmo mês do ano anterior, a meta calculada é
     // R$ 0,00 e qualquer venda "atinge" ela. O topo já tratava isso; esta
     // seção dizia "atingida" com meta zerada.
-    g.appendChild(P[mi] > 0
+    g.appendChild(temMetaMes
       ? kpi('Meta do mês', brl(metaMes), A[mi] >= metaMes ? 'atingida' : 'faltam ' + brl(metaMes-A[mi]))
       : kpi('Meta do mês', 'sem base', `${MES[mi]}/${ano-1} não teve faturamento`));
   } else {
