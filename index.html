@@ -899,7 +899,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.07.25';
+const VERSAO = '2026.08.03';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -2795,7 +2795,7 @@ function parseRFNF613(txt){
     out.push({
       nf: a, emissao: dt,
       cliente_cod : (c[2] ||'').trim(),
-      cliente_nome: (c[3] ||'').trim(),
+      cliente_nome: nomeCliente(c),
       produto_cod : (c[5] ||'').trim() || null,
       derivacao   : (c[6] ||'').trim() || null,
       produto_desc: (c[8] ||'').trim() || null,
@@ -2818,6 +2818,24 @@ function parseRFNF613(txt){
     primeiras: cru.slice(0,8).map(l => l.slice(0,150))
   };
   return out;
+}
+
+// O RFNF613 traz o nome do cliente em UMA de duas colunas vizinhas, e
+// nunca nas duas: o Senior usa c[3] quando o cadastro tem nome reduzido
+// e c[4] quando só tem a razão social, preenchendo a outra com "-".
+// Lendo só c[3], essas linhas entravam com o nome literal "-" — o que
+// não quebra o faturamento (as colunas numéricas não se deslocam, por
+// isso a reconciliação sempre fechou), mas quebra tudo que depende do
+// NOME: grupo econômico e filtro PETMED casam por pedaço de nome, e "-"
+// não casa com nada. Resultado: parte da receita de NIPPO, LUNIM,
+// DOGNIFICO, MASTER PET e SJR escapava do grupo e virava um "cliente"
+// fantasma chamado "-", e o PETMED não sumia inteiro quando desligado.
+// Verificado nos dois arquivos reais: em 100% das linhas de dado
+// exatamente uma das duas colunas está preenchida.
+function nomeCliente(c){
+  const a = (c[3] || '').trim(), b = (c[4] || '').trim();
+  const vazio = v => !v || v === '-';
+  return vazio(a) ? (vazio(b) ? '' : b) : a;
 }
 
 // divisor de CSV que respeita aspas
