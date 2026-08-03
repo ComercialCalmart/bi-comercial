@@ -899,7 +899,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.03';
+const VERSAO = '2026.08.03b';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -1863,13 +1863,15 @@ function somaMetas(ano, P, meta, ate){
 function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
   if(periodo === 'mes'){
     const diasNoMes = new Date(Date.UTC(ano, ultimo+1, 0)).getUTCDate();
-    // "Dia de hoje" só faz sentido pro mês que está de fato em andamento
-    // (mesmo ano e mesmo mês de "hoje"). Se o Ano-base estiver puxado
-    // pra um ano já fechado, esse mês já acabou — trata como 100%
-    // decorrido (dia = último dia do mês), em vez de usar o dia do
-    // relógio real, que pertenceria a um mês completamente diferente.
-    const mesEmAndamento = (ano === hoje.getUTCFullYear() && ultimo === hoje.getUTCMonth());
-    const diaAtual = mesEmAndamento ? hoje.getUTCDate() : diasNoMes;
+    // Quanto do mês já correu. Agora medido pelo relógio real, não pela
+    // última NF: o card passou a poder exibir um mês que ainda não tem
+    // nota nenhuma (agosto no dia 3), e nesse mês "hoje" pela última NF
+    // apontaria para julho, dando dia 31 de um mês que mal começou.
+    // Mês que não é o corrente (ano-base fechado, ou mês já vencido)
+    // conta como 100% decorrido.
+    const agora = new Date();
+    const mesEmAndamento = (ano === agora.getUTCFullYear() && ultimo === agora.getUTCMonth());
+    const diaAtual = mesEmAndamento ? agora.getUTCDate() : diasNoMes;
     const realizado = A[ultimo] || 0;
     const metaPeriodo = metaDoMes(ano, ultimo, P[ultimo] || 0, meta);
     const metaFixa = temMetaFixaNoMes(ano, ultimo);
@@ -1887,12 +1889,20 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
       else if(unidadesRestantes > 0){ ritmoNecessario = falta/unidadesRestantes; acimaDoRitmo = ritmoAtual >= ritmoNecessario; }
       else acimaDoRitmo = false;   // último dia do mês, meta ainda não batida
     }
+    // Mês corrente sem nenhuma NF ainda: o alvo e o ritmo necessário são
+    // informação útil ("preciso de tanto por dia"), mas o selo vermelho
+    // de "abaixo do ritmo" e o comparativo de −100% contra o ano passado
+    // não são — no dia 3, com a base fechando no mês anterior, os dois
+    // só dizem que o mês ainda não começou, o que a tela já mostra.
+    const aguardando = mesEmAndamento && realizado === 0;
+    if(aguardando) acimaDoRitmo = null;
     const difAnoPassado = P[ultimo] ? (realizado/P[ultimo] - 1)*100 : 0;
     return {
       rotulo: `Meta do mês · ${MES[ultimo]}/${ano}`, periodoCurto: `${MES[ultimo]}/${ano}`, unidade:'dia',
-      realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa,
+      realizado, metaPeriodo, temMeta, pct, falta, ritmoAtual, ritmoNecessario, acimaDoRitmo, metaFixa, aguardando,
       semBase: `Sem faturamento em ${MES[ultimo]}/${ano-1} para calcular a meta do mês.`,
-      difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`
+      difComparativo: difAnoPassado, comparativoTexto: `${MES[ultimo]}/${ano-1}`,
+      contextoAlt: aguardando ? `Nenhuma NF de ${MES[ultimo]} na base ainda.` : null
     };
   }
   const accA = A.slice(0, ultimo+1).reduce((a,b)=>a+b,0);
@@ -1935,7 +1945,10 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
 
 // A partir de uma vista (ano ou mês), monta o bloco pronto pro grid.
 function blocoDaVista(vista){
-  const status = !vista.temMeta ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
+  // 'aguardando' = mês corrente ainda sem NF na base. Não é desempenho
+  // ruim, é mês recém-começado, então fica âmbar (atenção) e não
+  // vermelho, que aqui significaria "está indo mal".
+  const status = (!vista.temMeta || vista.aguardando) ? 'atencao' : vista.acimaDoRitmo ? 'alta' : 'baixa';
   // O número grande do cartão é o FATURADO. Antes o título dizia "Meta
   // anual" logo acima dele e o olho amarrava as duas coisas, enquanto a
   // meta de verdade ficava no menor texto do bloco, depois de um "%".
@@ -1958,7 +1971,9 @@ function blocoDaVista(vista){
       : `${chip} ritmo atual ${brl(vista.ritmoAtual)}/${vista.unidade}`;
   return blocoMeta(
     status, titulo, brl(vista.realizado), vista.pct, linhaMeta, linhaRitmo,
-    `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
+    vista.contextoAlt
+      ? vista.contextoAlt
+      : `<span class="resumo-selo">${vista.difComparativo>=0?'+':'−'}${Math.abs(vista.difComparativo).toFixed(1).replace('.',',')}%</span> vs. ${vista.comparativoTexto}`,
     vista.metaFixa
   );
 }
@@ -1983,9 +1998,20 @@ function secResumo(B, ano, meta, jan, hoje){
   const temAno = ultimoMes >= 0;
   const ultimo = temAno ? ultimoMes : 0;
 
+  // Qual mês o card do mês deve mostrar. Enquanto o relógio real ainda
+  // está dentro do mês da última NF, é ele mesmo. Quando o mês vira, o
+  // anterior fechou: continuar exibindo "faltam R$ 23 mil" para um mês
+  // que acabou é pedir para correr atrás de um trem que já partiu. Só
+  // vale para o ano corrente; com o Ano-base puxado para um ano fechado,
+  // o mês certo continua sendo o último com venda daquele ano.
+  const agora = new Date();
+  const mesCard = (ano === agora.getUTCFullYear() && agora.getUTCMonth() > ultimo)
+    ? agora.getUTCMonth()
+    : ultimo;
+
   // 1. meta anual — 2. meta do mês: os dois sempre visíveis, lado a lado.
   grade.appendChild(blocoDaVista(vistaMeta('ano', A, P, ano, meta, temAno, ultimo, hoje)));
-  grade.appendChild(blocoDaVista(vistaMeta('mes', A, P, ano, meta, temAno, ultimo, hoje)));
+  grade.appendChild(blocoDaVista(vistaMeta('mes', A, P, ano, meta, temAno, mesCard, hoje)));
 
   // 3. Cadência (na hora de ligar) + Carteira (últimos 7 dias),
   // compiladas num só bloco — nenhuma das duas tem meta, só contagem.
