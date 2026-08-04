@@ -405,6 +405,12 @@ svg{display:block;width:100%;height:auto}
   margin-top:16px;padding-top:14px;border-top:1px solid var(--linha-fina);
 }
 .leg i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border-radius:3px}
+/* Amostra da hachura na legenda: o <i> comum é um quadrado de cor
+   sólida, e a carteira precisa mostrar que é preenchimento riscado. */
+.leg i.leg-carteira{
+  background:repeating-linear-gradient(45deg,var(--azul) 0 2px,#fff 2px 5px);
+  border:1px dashed var(--azul);opacity:.85;border-radius:2px;
+}
 svg rect[data-mes]{cursor:pointer;transition:opacity var(--rapido)}
 svg rect[data-mes]:hover{opacity:.78}
 
@@ -899,7 +905,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.03e';
+const VERSAO = '2026.08.04';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -951,6 +957,30 @@ const CONFIG = {
   // valor diferente do que a regra de 25% projetava.
   METAS_FIXAS: {
     2026: { 6:417000, 7:491000, 8:513000, 9:614000, 10:565000, 11:400000 }
+  },
+
+  // Pedidos em carteira: já vendidos, ainda não faturados. Entram no
+  // gráfico de faturamento como um bloco hachurado empilhado sobre o
+  // realizado do mês, e SÓ ali. Não somam em KPI, meta, acumulado,
+  // curva ABC, cadência nem em nada mais: carteira pode não virar nota,
+  // e um número que talvez não aconteça não pode contaminar o que já
+  // aconteceu. Ao importar o mês, o realizado sobe e este número deve
+  // ser zerado ou atualizado à mão.
+  // Índice do mês 0-based (jan=0 ... dez=11), igual ao array MES.
+  CARTEIRA: {
+    2026: {
+      7: {   // agosto
+        itens: [
+          ['Nippo',              39873.40],
+          ['Lunim',              36963.88],
+          ['Utilaço',            15111.00],
+          ['Mariana Siqueira',   15655.99],
+          ['Galpão (acumulado)', 10259.28],
+          ['Attabuy',             7671.36],
+          ['Pet Web',             4570.41]
+        ]
+      }
+    }
   },
 
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
@@ -1854,6 +1884,15 @@ function metaDoMes(ano, mes, valorAnoAnterior, meta){
   const fixa = CONFIG.METAS_FIXAS?.[ano]?.[mes];
   return fixa != null ? fixa : valorAnoAnterior * (1+meta);
 }
+// Pedidos em carteira de um mês: total e quebra por cliente. Devolve
+// null quando não há nada registrado, que é o caso da maioria dos meses.
+function carteiraDoMes(ano, mes){
+  const c = CONFIG.CARTEIRA?.[ano]?.[mes];
+  if(!c || !c.itens?.length) return null;
+  const total = c.itens.reduce((a, [,v]) => a + v, 0);
+  return total > 0 ? { total, itens: c.itens } : null;
+}
+
 function temMetaFixaNoMes(ano, mes){ return CONFIG.METAS_FIXAS?.[ano]?.[mes] != null; }
 function anoTemAlgumaMetaFixa(ano){ return !!CONFIG.METAS_FIXAS?.[ano]; }
 
@@ -2134,12 +2173,16 @@ function secFaturamento(B, ano, meta, filtroMes){
   // tracejada no gráfico pode mudar de inclinação a partir de um mês
   // sem que nada tenha mudado no faturamento real daquele mês.
   const linhaMeta = P.map((v,i) => metaDoMes(ano, i, v, meta));
+  // A legenda só ganha a entrada de carteira quando existe carteira no
+  // ano em tela; nos anos fechados ela não aparece e não polui.
+  const temCarteiraNoAno = Array.from({length:12}, (_,i) => carteiraDoMes(ano, i)).some(Boolean);
   p.innerHTML = `<div class="graf-rolo graf-denso">${barrasDuplas(A, P, linhaMeta, ano, filtroMes)}</div>`;
   p.insertAdjacentHTML('beforeend',
     `<div class="leg">
       <span><i style="background:var(--azul)"></i>${ano}</span>
       <span><i style="background:#C2CCE2"></i>${ano-1}</span>
       <span><i style="background:var(--sinal)"></i>meta</span>
+      ${temCarteiraNoAno ? '<span><i class="leg-carteira"></i>em carteira</span>' : ''}
     </div>`);
   s.appendChild(p);
   return s;
@@ -2147,9 +2190,22 @@ function secFaturamento(B, ano, meta, filtroMes){
 
 function barrasDuplas(A, P, M, ano, filtroMes){
   const W=1160,H=300,e=64,d=16,t=22,b=34;
-  const max = Math.max(...A, ...P, ...M, 1)*1.12;
+  // A escala tem que caber o topo da pilha (realizado + carteira), senão
+  // o bloco previsto estoura para fora da área do gráfico.
+  const topos = A.map((v,i) => v + (carteiraDoMes(ano, i)?.total || 0));
+  const max = Math.max(...topos, ...P, ...M, 1)*1.12;
   const lg = (W-e-d)/12, y = v => t + (H-t-b)*(1 - v/max);
-  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal comparado">`;
+  // Hachura diagonal: sinaliza "isto ainda não é nota" sem inventar uma
+  // cor nova na paleta. Fundo branco para não escurecer contra a barra
+  // cheia do lado, traço no azul do ano corrente para amarrar as duas
+  // coisas ao mesmo mês.
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Faturamento mensal comparado">
+    <defs>
+      <pattern id="hachCarteira" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+        <rect width="6" height="6" fill="#fff"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="var(--azul)" stroke-width="2.6" opacity="0.5"/>
+      </pattern>
+    </defs>`;
   const pontosMeta = [];   // [x, y, i] de cada mês com meta > 0; vira a trilha contínua depois do laço
   for(let i=0;i<=4;i++){
     const v = max*i/4, yy = y(v);
@@ -2183,6 +2239,23 @@ function barrasDuplas(A, P, M, ano, filtroMes){
     // desenhadas depois do laço inteiro, para passar por cima das doze
     // barras de uma vez, como uma trilha de meta atravessando o ano.
     if(M[i] > 0) pontosMeta.push([x+lg*0.66, y(M[i]), i]);
+    // Pedidos em carteira empilhados sobre o realizado do mês: vendido,
+    // ainda não faturado. Hachurado e com contorno tracejado justamente
+    // para não se confundir com barra cheia — é previsão, não resultado.
+    // Some sozinho quando o mês for importado e o CONFIG for zerado.
+    const cart = carteiraDoMes(ano, i);
+    if(cart){
+      const base = A[i] || 0;
+      const yTopo = y(base + cart.total), yBase = y(base);
+      const detalhe = cart.itens.slice().sort((p,q) => q[1]-p[1])
+        .map(([n,v]) => `${n}: ${brl(v)}`).join('\n');
+      g += `<rect x="${x+lg*0.50}" y="${yTopo.toFixed(1)}" width="${w}" height="${(yBase-yTopo).toFixed(1)}"
+        fill="url(#hachCarteira)" stroke="var(--azul)" stroke-width="1.2" stroke-dasharray="3 2" opacity="${ativo?0.45:0.9}"
+        ><title>Em carteira · ${MES[i]}/${ano}: ${brl(cart.total)}\n\n${detalhe}\n\nPedido colocado, ainda não faturado.</title></rect>`;
+      g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(yTopo-6).toFixed(1)}" text-anchor="middle"
+        font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)" opacity="0.75">+${abrevBRL(cart.total)}</text>`;
+    }
+
     // Rótulo do valor da meta, em ago–dez/2026 (ou qualquer mês com
     // entrada em METAS_FIXAS). Antes sumia assim que a primeira NF do
     // mês entrava (A[i] deixava de ser 0) — pedido revertido: o valor
@@ -2197,10 +2270,13 @@ function barrasDuplas(A, P, M, ano, filtroMes){
     // mais um degrau em vez de ficar colado.
     if(M[i] > 0 && temMetaFixaNoMes(ano, i)){
       let yMeta = y(M[i]) - 8;
-      if(A[i] > 0){
-        const yAtual = y(A[i]) - 6;
-        if(Math.abs(yMeta - yAtual) < 12) yMeta = Math.min(yMeta, yAtual) - 12;
-      }
+      // Concorrentes por espaço nesta coluna: o rótulo do realizado e,
+      // agora, o da carteira, que fica mais alto ainda por estar
+      // empilhado. Testa contra os dois, não só contra o realizado.
+      const vizinhos = [];
+      if(A[i] > 0) vizinhos.push(y(A[i]) - 6);
+      if(cart) vizinhos.push(y((A[i]||0) + cart.total) - 6);
+      vizinhos.forEach(yv => { if(Math.abs(yMeta - yv) < 12) yMeta = Math.min(yMeta, yv) - 12; });
       g += `<text x="${(x+lg*0.66).toFixed(1)}" y="${yMeta.toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="700" fill="var(--sinal)">${abrevBRL(M[i])}</text>`;
     }
     // Cada barra com dado leva o próprio valor em cima, cada rótulo
