@@ -905,7 +905,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.04';
+const VERSAO = '2026.08.06';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -1241,6 +1241,22 @@ function base(){
 // engolia o resto da linha; & e < quebrariam a renderização.
 const ESCAPES = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESCAPES[c]);
+
+// O dia de HOJE no calendário de quem está olhando a tela, devolvido na
+// mesma convenção das NFs (meia-noite UTC), para poder comparar direto
+// com r.dt.
+//
+// Cuidado que já custou caro aqui: as NFs vêm do Senior como data
+// brasileira (dd/mm/aaaa) e são gravadas como meia-noite UTC. Logo o
+// "hoje" comparável tem que ser o dia do calendário BRASILEIRO, que é o
+// que os getters LOCAIS devolvem. Usar getUTCDate()/getUTCMonth() para
+// descobrir o dia de hoje faz o dashboard virar o dia (e o mês) às 21h
+// no horário de Brasília, três horas antes da hora: às 22h de 31/07 o
+// card do mês já pulava para agosto.
+function hojeReal(){
+  const a = new Date();
+  return new Date(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()));
+}
 
 const dia = 86400000;
 const diasEntre = (a,b) => Math.round((b - a)/dia);
@@ -1719,9 +1735,7 @@ $('#fabImportar').onclick = abrirImportacao;
 // navegador), não com "hoje" do dashboard, que é sempre a última NF.
 // É o único jeito de saber se a importação semanal está em dia.
 function seloAtualizacao(hoje){
-  const agora = new Date();
-  const agoraUTC = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()));
-  const dias = diasEntre(hoje, agoraUTC);
+  const dias = diasEntre(hoje, hojeReal());
   const [nivel, texto] = dias <= 2 ? ['fresco','atualizado']
     : dias <= 7 ? ['atencao','verificar import.']
     : ['velho','desatualizado'];
@@ -1914,7 +1928,7 @@ function vistaMeta(periodo, A, P, ano, meta, temAno, ultimo, hoje){
     // apontaria para julho, dando dia 31 de um mês que mal começou.
     // Mês que não é o corrente (ano-base fechado, ou mês já vencido)
     // conta como 100% decorrido.
-    const agora = new Date();
+    const agora = hojeReal();
     const mesEmAndamento = (ano === agora.getUTCFullYear() && ultimo === agora.getUTCMonth());
     const diaAtual = mesEmAndamento ? agora.getUTCDate() : diasNoMes;
     const realizado = A[ultimo] || 0;
@@ -2055,7 +2069,7 @@ function secResumo(B, ano, meta, jan, hoje){
   // que acabou é pedir para correr atrás de um trem que já partiu. Só
   // vale para o ano corrente; com o Ano-base puxado para um ano fechado,
   // o mês certo continua sendo o último com venda daquele ano.
-  const agora = new Date();
+  const agora = hojeReal();
   const mesCard = (ano === agora.getUTCFullYear() && agora.getUTCMonth() > ultimo)
     ? agora.getUTCMonth()
     : ultimo;
