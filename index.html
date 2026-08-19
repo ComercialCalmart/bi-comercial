@@ -911,7 +911,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.19';
+const VERSAO = '2026.08.20';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -977,11 +977,10 @@ const CONFIG = {
     2026: {
       7: {   // agosto
         itens: [
-          ['Nippo',              39873.40],
-          ['Galpão (acumulado)', 20804.80],
-          ['Attabuy',             8109.78],
-          ['Pet Web',             4570.41],
-          ['Alfer',               3650.08],
+          ['Galpão (acumulado)', 47462.12],
+          ['Attabuy',            19486.34],
+          ['Bio Sul',             4096.30],
+          ['Nippo',               1857.55],
           ['Lunim',               1857.55]
         ]
       }
@@ -1133,7 +1132,12 @@ function sessaoExpirada(erro){
 
 function voltarAoLogin(motivo){
   $('#app').style.display   = 'none';
-  $('#login').style.display = '';
+  // 'grid', o mesmo display que #login tem na folha de estilo, e nunca
+  // ''. String vazia só remove o inline anterior (posto no abrir()),
+  // e como o inline era 'none', o login continuaria escondido: app
+  // oculto e login oculto ao mesmo tempo dão página em branco, sem
+  // erro nenhum no console. A página de Produtos caiu nessa.
+  $('#login').style.display = 'grid';
   $('#erroLogin').textContent = motivo || 'Sua sessão expirou. Entre de novo.';
 }
 
