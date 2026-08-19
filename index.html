@@ -147,6 +147,11 @@ header .marca span{color:var(--menta)}
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);
   color:#fff;padding:6px 13px;border-radius:var(--r-p);font-size:12.5px;font-weight:500;
   transition:background var(--rapido), border-color var(--rapido), transform var(--rapido);
+  /* A regra nasceu para <button>, que herda tamanho e já vem sem
+     sublinhado. O link de Produtos usa <a>, que precisa dos dois
+     explícitos para não sair sublinhado e com outra família. */
+  text-decoration:none;font-family:inherit;line-height:1.4;
+  display:inline-flex;align-items:center;cursor:pointer;
 }
 .btn-h:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3)}
 .btn-h:active{transform:translateY(1px)}
@@ -802,6 +807,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
     <span style="font-size:12px;color:rgba(255,255,255,.58);letter-spacing:.1em">BI COMERCIAL</span>
     <div class="dir">
       <span class="quem" id="quem"></span>
+      <a class="btn-h" id="linkProdutos" href="https://comercialcalmart.github.io/bi-produtos/">Produtos</a>
       <button class="btn-h" id="btnImportar">Importar CSV</button>
       <button class="btn-h" id="btnSair">Sair</button>
     </div>
@@ -905,7 +911,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.09';
+const VERSAO = '2026.08.19';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
