@@ -911,7 +911,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.24';
+const VERSAO = '2026.08.27';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -930,6 +930,63 @@ const log = {
   info(...a){ this._('info', a); },
   erro(...a){ this._('error', a); }
 };
+
+/* ==========================================================
+   CARTEIRA — pedidos já vendidos, ainda não faturados.
+   Edite só isto aqui embaixo quando precisar mexer na carteira, sem
+   precisar me mandar a planilha: são três coisas para preencher.
+
+   1. MES_CARTEIRA — o número do mês (1=janeiro ... 12=dezembro).
+      Zero ou null desliga a carteira inteira, não importa o que
+      estiver escrito em TEXTO_CARTEIRA logo abaixo.
+   2. ANO_CARTEIRA — o ano. Lembre de trocar quando o ano virar.
+   3. TEXTO_CARTEIRA — uma linha por cliente, assim:
+        Nome do cliente: valor
+      O valor aceita tanto o jeito do Excel (1.857,55) quanto o
+      jeito americano (1857.55) — os dois funcionam, sem precisar
+      escolher. Linha em branco é ignorada.
+
+   Quando o mês fechar e a nota já tiver sido importada de verdade,
+   apague as linhas de dentro de TEXTO_CARTEIRA (deixe as duas crases
+   vazias, tipo `` ``) ou zere MES_CARTEIRA — qualquer um dos dois já
+   tira o bloco do gráfico. Aí fica pronto pro mês seguinte: só trocar
+   o número do mês e colar a lista nova quando precisar de novo.
+   ========================================================== */
+const MES_CARTEIRA   = null;    // ex.: 9 para setembro. null = carteira desligada.
+const ANO_CARTEIRA   = 2026;
+const TEXTO_CARTEIRA = ``;
+
+// Lê TEXTO_CARTEIRA linha a linha. O ÚLTIMO ":" da linha separa nome de
+// valor (não o primeiro), então um nome de cliente que tenha ":" dentro
+// (raro, mas existe em razão social) ainda funciona certo. Linha sem
+// ":", ou cujo valor não vira número, é descartada e avisada no
+// console — sem travar a página inteira por causa de uma vírgula fora
+// do lugar.
+function carteiraTextoParaItens(texto){
+  const itens = [];
+  for(const linhaCrua of texto.split('\n')){
+    const linha = linhaCrua.trim();
+    if(!linha) continue;
+    const i = linha.lastIndexOf(':');
+    if(i < 0){ log.erro('[carteira] linha sem ":" ignorada:', linha); continue; }
+    const nome = linha.slice(0, i).trim();
+    let valorTxt = linha.slice(i+1).trim().replace(/^R\$\s*/i, '');
+    // "1.857,55" (formato do Excel/BR) vira 1857.55; "1857.55" (já no
+    // formato que o JS entende) passa direto, sem mexer.
+    if(/,\d{1,2}$/.test(valorTxt)) valorTxt = valorTxt.replace(/\./g, '').replace(',', '.');
+    const valor = parseFloat(valorTxt);
+    if(!nome || !Number.isFinite(valor)){ log.erro('[carteira] linha não reconhecida:', linha); continue; }
+    itens.push([nome, valor]);
+  }
+  return itens;
+}
+
+function montarCarteiraConfig(){
+  if(!MES_CARTEIRA) return {};
+  const itens = carteiraTextoParaItens(TEXTO_CARTEIRA);
+  if(!itens.length) return {};
+  return { [ANO_CARTEIRA]: { [MES_CARTEIRA - 1]: { itens } } };
+}
 
 const CONFIG = {
   SUPABASE_URL : 'https://limkqsbhblbctpajzjdz.supabase.co',
@@ -970,23 +1027,10 @@ const CONFIG = {
   // realizado do mês, e SÓ ali. Não somam em KPI, meta, acumulado,
   // curva ABC, cadência nem em nada mais: carteira pode não virar nota,
   // e um número que talvez não aconteça não pode contaminar o que já
-  // aconteceu. Ao importar o mês, o realizado sobe e este número deve
-  // ser zerado ou atualizado à mão.
-  // Índice do mês 0-based (jan=0 ... dez=11), igual ao array MES.
-  CARTEIRA: {
-    2026: {
-      7: {   // agosto
-        itens: [
-          ['Galpão (Período Fechado)', 57186.40],
-          ['Tri1Pet',                   8449.20],
-          ['Attabuy',                   1796.23],
-          ['Bio Sul',                   4096.30],
-          ['Nippo',                     2284.15],
-          ['Lunim',                     1857.55]
-        ]
-      }
-    }
-  },
+  // aconteceu.
+  // O conteúdo vem do bloco MES_CARTEIRA / ANO_CARTEIRA / TEXTO_CARTEIRA
+  // logo no topo do arquivo — edite lá, não aqui.
+  CARTEIRA: montarCarteiraConfig(),
 
   MIN_COMPRAS_RITMO : 4,    // menos que isso não dá para medir cadência
   ATRASO_MINIMO     : 21,   // dias de atraso para entrar na worklist
