@@ -911,7 +911,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.08.27';
+const VERSAO = '2026.09.08';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -952,9 +952,13 @@ const log = {
    tira o bloco do gráfico. Aí fica pronto pro mês seguinte: só trocar
    o número do mês e colar a lista nova quando precisar de novo.
    ========================================================== */
-const MES_CARTEIRA   = null;    // ex.: 9 para setembro. null = carteira desligada.
+const MES_CARTEIRA   = 9;       // ex.: 9 para setembro. null = carteira desligada.
 const ANO_CARTEIRA   = 2026;
-const TEXTO_CARTEIRA = ``;
+const TEXTO_CARTEIRA = `
+  Galpão Drop (acumulado): 39.381,98
+  Scarmif: 10.901,32
+  Pet Web: 7.102,42
+`;
 
 // Lê TEXTO_CARTEIRA linha a linha. O ÚLTIMO ":" da linha separa nome de
 // valor (não o primeiro), então um nome de cliente que tenha ":" dentro
