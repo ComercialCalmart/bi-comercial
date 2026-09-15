@@ -911,7 +911,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.09.09b';
+const VERSAO = '2026.09.09c';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -2321,11 +2321,15 @@ function barrasDuplas(A, P, M, ano, filtroMes){
     if(cart){
       const base = A[i] || 0;
       const yTopo = y(base + cart.total), yBase = y(base);
+      // Abreviado em todo lugar que a carteira aparece — cada cliente e
+      // a soma —, igual ao rótulo que já fica em cima do bloco no
+      // gráfico. É previsão, não nota fechada: precisão de centavo aqui
+      // sugere uma certeza que o número não tem.
       const detalhe = cart.itens.slice().sort((p,q) => q[1]-p[1])
-        .map(([n,v]) => `${n}: ${brl(v)}`).join('\n');
+        .map(([n,v]) => `${n}: ${abrevBRL(v)}`).join('\n');
       g += `<rect x="${x+lg*0.50}" y="${yTopo.toFixed(1)}" width="${w}" height="${(yBase-yTopo).toFixed(1)}"
         fill="url(#hachCarteira)" stroke="var(--azul)" stroke-width="1.2" stroke-dasharray="3 2" opacity="${ativo?0.45:0.9}"
-        ><title>Em carteira · ${MES[i]}/${ano}: ${brl(cart.total)}\n\n${detalhe}\n\nPedido colocado, ainda não faturado.</title></rect>`;
+        ><title>Em carteira · ${MES[i]}/${ano}: ${abrevBRL(cart.total)}\n\n${detalhe}\n\nPedido colocado, ainda não faturado.</title></rect>`;
       g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(yTopo-6).toFixed(1)}" text-anchor="middle"
         font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)" opacity="0.75">+${abrevBRL(cart.total)}</text>`;
     }
