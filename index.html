@@ -416,6 +416,7 @@ svg{display:block;width:100%;height:auto}
   background:repeating-linear-gradient(45deg,var(--azul) 0 2px,#fff 2px 5px);
   border:1px dashed var(--azul);opacity:.85;border-radius:2px;
 }
+.leg i.leg-total{width:auto;height:auto;padding:1px 5px;font:700 9px/1.3 var(--mono);color:#fff;background:var(--azul);border-radius:8px;vertical-align:1px}
 svg rect[data-mes]{cursor:pointer;transition:opacity var(--rapido)}
 svg rect[data-mes]:hover{opacity:.78}
 
@@ -911,7 +912,7 @@ table.abc tbody tr[data-ck]:focus-visible{outline:none;box-shadow:inset 0 0 0 2p
 // Carimbo da versão publicada. Sem isso não dá para saber, olhando a
 // tela, qual HTML está no ar depois de um deploy: some no rodapé da
 // barra e no console, e é a primeira pergunta de qualquer suporte.
-const VERSAO = '2026.10.19';
+const VERSAO = '2026.10.19b';
 
 // Diagnóstico nunca pode derrubar a aplicação. Extensão de privacidade,
 // webview embutido e alguns modos de navegação substituem o console por
@@ -2256,7 +2257,7 @@ function secFaturamento(B, ano, meta, filtroMes){
       <span><i style="background:var(--azul)"></i>${ano}</span>
       <span><i style="background:#C2CCE2"></i>${ano-1}</span>
       <span><i style="background:var(--sinal)"></i>meta</span>
-      ${temCarteiraNoAno ? '<span><i class="leg-carteira"></i>em carteira</span>' : ''}
+      ${temCarteiraNoAno ? '<span><i class="leg-carteira"></i>em carteira</span><span><i class="leg-total">=k</i>realizado + carteira</span>' : ''}
     </div>`);
   s.appendChild(p);
   return s;
@@ -2329,9 +2330,19 @@ function barrasDuplas(A, P, M, ano, filtroMes){
         .map(([n,v]) => `${n}: ${abrevBRL(v)}`).join('\n');
       g += `<rect x="${x+lg*0.50}" y="${yTopo.toFixed(1)}" width="${w}" height="${(yBase-yTopo).toFixed(1)}"
         fill="url(#hachCarteira)" stroke="var(--azul)" stroke-width="1.2" stroke-dasharray="3 2" opacity="${ativo?0.45:0.9}"
-        ><title>Em carteira · ${MES[i]}/${ano}: ${abrevBRL(cart.total)}\n\n${detalhe}\n\nPedido colocado, ainda não faturado.</title></rect>`;
+        ><title>Em carteira · ${MES[i]}/${ano}: ${abrevBRL(cart.total)}\n\n${detalhe}\n\nPedido colocado, ainda não faturado.${base>0 ? `\n\nRealizado ${abrevBRL(base)} + carteira ${abrevBRL(cart.total)} = ${abrevBRL(base+cart.total)}` : ''}</title></rect>`;
       g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(yTopo-6).toFixed(1)}" text-anchor="middle"
         font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)" opacity="0.75">+${abrevBRL(cart.total)}</text>`;
+      // Soma realizado + carteira em destaque: pílula azul cheia, acima do
+      // "+Nk", para o olho ler o total do mês sem fazer a conta. Só quando
+      // já existe realizado — sem ele o total seria igual ao "+Nk".
+      if(base > 0){
+        const txt = '=' + abrevBRL(base + cart.total), pw = txt.length*5.8 + 10;
+        const cx = x+lg*0.65, py = yTopo - 29;
+        g += `<g opacity="${ativo?0.45:1}" pointer-events="none">
+          <rect x="${(cx-pw/2).toFixed(1)}" y="${py.toFixed(1)}" width="${pw.toFixed(1)}" height="14" rx="7" fill="var(--azul)"/>
+          <text x="${cx.toFixed(1)}" y="${(py+10.3).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9.5" font-weight="700" fill="#fff">${txt}</text></g>`;
+      }
     }
 
     // Rótulo do valor da meta, em ago–dez/2026 (ou qualquer mês com
@@ -2353,7 +2364,7 @@ function barrasDuplas(A, P, M, ano, filtroMes){
       // empilhado. Testa contra os dois, não só contra o realizado.
       const vizinhos = [];
       if(A[i] > 0) vizinhos.push(y(A[i]) - 6);
-      if(cart) vizinhos.push(y((A[i]||0) + cart.total) - 6);
+      if(cart) vizinhos.push(y((A[i]||0) + cart.total) - (A[i] > 0 ? 29 : 6));
       vizinhos.forEach(yv => { if(Math.abs(yMeta - yv) < 12) yMeta = Math.min(yMeta, yv) - 12; });
       g += `<text x="${(x+lg*0.66).toFixed(1)}" y="${yMeta.toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="700" fill="var(--sinal)">${abrevBRL(M[i])}</text>`;
     }
@@ -2370,7 +2381,7 @@ function barrasDuplas(A, P, M, ano, filtroMes){
     if(P[i] > 0)
       g += `<text x="${(x+lg*0.31).toFixed(1)}" y="${(y(P[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="#8C94B2">${abrevBRL(P[i])}</text>`;
     if(A[i] > 0)
-      g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(y(A[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)">${abrevBRL(A[i])}</text>`;
+      g += `<text x="${(x+lg*0.65).toFixed(1)}" y="${(y(A[i])-6).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" font-weight="600" fill="var(--azul)"${cart ? ' stroke="#fff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"' : ''}>${abrevBRL(A[i])}</text>`;
     g += `<text x="${x+lg/2}" y="${H-12}" text-anchor="middle" font-family="IBM Plex Sans Condensed" font-size="${ativo?12:11}" font-weight="${ativo?700:400}" fill="${ativo?'var(--azul)':'#5C6689'}">${MES[i]}</text>`;
   }
   // Uma linha só, ligando os doze pontos em ordem (M-L-L-L...), por cima
